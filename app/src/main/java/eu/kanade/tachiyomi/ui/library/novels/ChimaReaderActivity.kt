@@ -373,7 +373,7 @@ class ChimaReaderActivity : NovelReaderActivity() {
         if (stored != null && stored.startsWith("http")) {
             eu.kanade.tachiyomi.util.system.CoverImage.load(this, key, stored)?.let { return it }
         }
-        val file = stored?.removePrefix("file://")?.let(::java.io.File)?.takeIf { it.isFile }
+        val file = stored?.removePrefix("file://")?.let { java.io.File(it) }?.takeIf { it.isFile }
             ?: withContext(Dispatchers.IO) {
                 runCatching {
                     val dir = chimahon.novel.data.BookStorage.getBookDirectory(this@ChimaReaderActivity, meta.folder ?: meta.id)
