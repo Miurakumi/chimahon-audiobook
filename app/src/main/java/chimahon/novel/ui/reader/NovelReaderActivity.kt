@@ -151,6 +151,21 @@ open class NovelReaderActivity : ComponentActivity() {
         bitmap: Bitmap,
     ) = onLookupRequested(word, sentence, x, y, w, h)
 
+    /**
+     * Override in subclass to receive a dictionary lookup from the audiobook dial: the text
+     * from the tapped character to the end of the sentence, the full line, the tapped offset in
+     * the line, and the anchor box in window pixels.
+     */
+    protected open fun onAudiobookLookupRequested(
+        word: String,
+        sentence: String,
+        sentenceOffset: Int,
+        x: Float,
+        y: Float,
+        w: Float,
+        h: Float,
+    ) = Unit
+
     /** Override in subclass to receive the sentence context after onLookupRequested. */
     protected open fun onSentenceReady(sentence: String) = Unit
 
@@ -244,6 +259,9 @@ open class NovelReaderActivity : ComponentActivity() {
                     recognizeImage = { bitmap, language -> recognizeImage(bitmap, language) },
                     onImageOcrLookupRequested = { word, sentence, sentenceOffset, x, y, w, h, vertical, bitmap ->
                         onImageOcrLookupRequested(word, sentence, sentenceOffset, x, y, w, h, vertical, bitmap)
+                    },
+                    onAudiobookLookupRequested = { word, sentence, sentenceOffset, x, y, w, h ->
+                        onAudiobookLookupRequested(word, sentence, sentenceOffset, x, y, w, h)
                     },
                 )
                 PopupOverlay()

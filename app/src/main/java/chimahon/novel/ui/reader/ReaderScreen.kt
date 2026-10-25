@@ -71,9 +71,11 @@ fun ReaderScreen(
     onSelectionRectsReceived: ((String) -> Unit)? = null,
     recognizeImage: suspend (Bitmap, OcrLanguage) -> List<OcrResult> = { _, _ -> emptyList() },
     onImageOcrLookupRequested: (String, String, Int, Float, Float, Float, Float, Boolean, Bitmap) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
+    onAudiobookLookupRequested: (String, String, Int, Float, Float, Float, Float) -> Unit = { _, _, _, _, _, _, _ -> },
 ) {
     val context = LocalContext.current
 
+    var showAudiobook by remember { mutableStateOf(false) }
     var focusMode by remember { mutableStateOf(false) }
     var activeSheet by remember { mutableStateOf<ActiveSheet?>(null) }
     var tappedImageUri by remember { mutableStateOf<String?>(null) }
@@ -462,6 +464,10 @@ fun ReaderScreen(
                     contentColor = currentSettings.textColor,
                     onToggleHud = { onShowHudChanged(false) },
                     onToggleFocusMode = { focusMode = true },
+                    onOpenAudiobook = {
+                        showAudiobook = true
+                        onShowHudChanged(false)
+                    },
                     onOpenChapters = { activeSheet = ActiveSheet.Chapters },
                     onOpenAppearance = { activeSheet = ActiveSheet.Appearance },
                     onOpenStatistics = { activeSheet = ActiveSheet.Statistics },
@@ -522,6 +528,25 @@ fun ReaderScreen(
                 onDismiss = { tappedImageUri = null },
             )
         }
+
+        // Audiobook dial: full-screen layer on top of the EPUB. The dictionary popup is drawn
+        // by the activity after this screen, so it appears above the dial.
+        if (showAudiobook && readyVm != null) {
+            androidx.activity.compose.BackHandler(enabled = true) { showAudiobook = false }
+            ReaderThemedArea(readyVm.getReaderSettings(context)) {
+                chimahon.novel.audiobook.AudiobookScreen(
+                    bookKey = book.folder ?: book.id,
+                    title = readyVm.document.title().orEmpty(),
+                    isPopupActive = isPopupActive,
+                    onLookup = onAudiobookLookupRequested,
+                    onDismissPopup = onDismissPopupRequested,
+                    onClose = {
+                        onDismissPopupRequested()
+                        showAudiobook = false
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -572,6 +597,7 @@ private fun ReaderBottomBar(
     contentColor: Int,
     onToggleHud: () -> Unit,
     onToggleFocusMode: () -> Unit,
+    onOpenAudiobook: () -> Unit,
     onOpenChapters: () -> Unit,
     onOpenAppearance: () -> Unit,
     onOpenStatistics: () -> Unit,
@@ -596,6 +622,13 @@ private fun ReaderBottomBar(
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            IconButton(onClick = onOpenAudiobook) {
+                Icon(
+                    Icons.Outlined.Headphones,
+                    contentDescription = "Audiolibro",
+                    tint = Color(contentColor)
+                )
+            }
             IconButton(onClick = onOpenChapters) {
                 Icon(
                     Icons.AutoMirrored.Filled.List,

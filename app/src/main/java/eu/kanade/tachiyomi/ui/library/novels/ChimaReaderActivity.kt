@@ -346,6 +346,25 @@ class ChimaReaderActivity : NovelReaderActivity() {
         startLookup(word, sentence, x, y, w, h, isVerticalWriting, screenshot = null, resolveAnchorFromWebView = true)
     }
 
+    /** Lookup from the audiobook dial: same popup, no WebView anchor to resolve. */
+    override fun onAudiobookLookupRequested(
+        word: String,
+        sentence: String,
+        sentenceOffset: Int,
+        x: Float,
+        y: Float,
+        w: Float,
+        h: Float,
+    ) {
+        startLookup(
+            word, sentence, x, y, w, h,
+            vertical = false,
+            screenshot = null,
+            resolveAnchorFromWebView = false,
+            sentenceOffset = sentenceOffset,
+        )
+    }
+
     override suspend fun recognizeImage(bitmap: Bitmap, language: OcrLanguage): List<OcrResult> {
         val profileLanguage = getOrRefreshLookupPaths().first.languageCode
         val resolvedLanguage = OcrLanguage.entries.firstOrNull {
