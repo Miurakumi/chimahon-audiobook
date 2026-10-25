@@ -104,6 +104,7 @@ object Marker {
     const val MEDIA_NAME = "media-name"
     const val WORD_AUDIO = "word-audio"
     const val SENTENCE_AUDIO = "sentence-audio"
+    const val COVER = "cover"
 
     val ALL: List<String> = listOf(
         // Core/Common
@@ -135,7 +136,7 @@ object Marker {
         URL, CHAPTER, MEDIA, MEDIA_NAME,
 
         // Other
-        SENTENCE_AUDIO, POPUP_SELECTION_TEXT,
+        SENTENCE_AUDIO, POPUP_SELECTION_TEXT, COVER,
     )
 
     val ALL_WITH_TODO: List<String> = ALL
@@ -173,6 +174,7 @@ object Marker {
         CHAPTER to listOf("chapter", "episode"),
         MEDIA to listOf("media", "source", "context"),
         SENTENCE_AUDIO to listOf("sentence-audio", "sentenceaudio", "sentence-sound", "sentence_sound"),
+        COVER to listOf("cover", "book-cover", "cover-image", "bookcover"),
     )
 
     fun autoDetect(fieldName: String, fieldIndex: Int, entryType: String = "term"): String? {
@@ -217,6 +219,7 @@ object AnkiCardCreator {
 
     private const val TAG = "AnkiCardCreator"
     private const val SCREENSHOT_MEDIA_PLACEHOLDER = "chimahon_screenshot_pending.webp"
+    private const val COVER_MEDIA_PLACEHOLDER = "chimahon_cover_pending.jpg"
     private const val WORD_AUDIO_MEDIA_PLACEHOLDER = "chimahon_word_audio_pending.mp3"
     private const val SENTENCE_AUDIO_MEDIA_PLACEHOLDER = "chimahon_sentence_audio_pending.m4a"
     private val duplicateGate = AnkiDuplicateGate()
@@ -333,6 +336,7 @@ object AnkiCardCreator {
             }
             val hasSentenceAudioMarker = fieldMap.values.any { it.contains("{${Marker.SENTENCE_AUDIO}}") }
             val hasScreenshotMarker = fieldMap.values.any { it.contains("{${Marker.SCREENSHOT}}") }
+            val hasCoverMarker = fieldMap.values.any { it.contains("{${Marker.COVER}}") }
             val lockKey = "${dupScope.lowercase()}|${if (dupScope == "deck") effectiveDeck else ""}|${result.term.expression}"
             suspend fun duplicateDecision(): AnkiDuplicateDecision {
                 if (!dupCheck && !forceOpen) return AnkiDuplicateDecision.Insert
@@ -414,6 +418,11 @@ object AnkiCardCreator {
                 wordAudio = if (hasWordAudioMarker) prepareWordAudioPayload(result) else null,
                 dictionaryMedia = prepareDictionaryMedia(exportMedia),
                 sentenceAudio = sentenceAudioPreparation,
+                cover = if (hasCoverMarker) {
+                    media?.coverBytes?.let { PreparedAnkiMediaPayload(generateCoverFilename(it), it) }
+                } else {
+                    null
+                },
             )
 
             duplicateGate.commit(lockKey, ::duplicateDecision) { finalDecision ->
@@ -703,6 +712,7 @@ object AnkiCardCreator {
     ): String =
         value
             .resolveImagePlaceholder(SCREENSHOT_MEDIA_PLACEHOLDER, media.screenshotFilename)
+            .resolveImagePlaceholder(COVER_MEDIA_PLACEHOLDER, media.coverFilename)
             .resolveSoundPlaceholder(WORD_AUDIO_MEDIA_PLACEHOLDER, media.wordAudioFilename)
             .resolveSoundPlaceholder(SENTENCE_AUDIO_MEDIA_PLACEHOLDER, media.sentenceAudio.filename)
 
@@ -910,6 +920,7 @@ object AnkiCardCreator {
         Marker.MORAE -> buildMorae(result.term.reading)
         Marker.PITCH_ACCENT_GRAPHS, Marker.PITCH_ACCENT_GRAPHS_JJ -> buildPitchAccentGraphs(result.term.reading, result.term.pitches)
         Marker.SCREENSHOT -> screenshotFilename?.let { "<img src=\"$it\">" } ?: ""
+        Marker.COVER -> if (media?.coverBytes != null) "<img src=\"$COVER_MEDIA_PLACEHOLDER\">" else ""
         Marker.SEARCH_QUERY -> escapeHtml(result.term.expression)
         Marker.URL -> ""
         Marker.MEDIA_NAME -> media?.mangaTitle?.let { escapeHtml(it) } ?: ""
@@ -2226,6 +2237,16 @@ object AnkiCardCreator {
             .replace(Regex("""--+"""), "-")
             .trim('-')
             .lowercase()
+
+    private fun generateCoverFilename(bytes: ByteArray): String {
+        val hash = try {
+            java.security.MessageDigest.getInstance("SHA-1").digest(bytes)
+                .joinToString("") { "%02x".format(it) }.take(12)
+        } catch (e: Exception) {
+            "cover_${System.currentTimeMillis()}"
+        }
+        return "chimahon_cover_$hash.jpg"
+    }
 
     private fun generateScreenshotFilename(bytes: ByteArray): String {
         val hash = try {

@@ -70,6 +70,9 @@ internal fun PlayerVideoOcrOverlay(
     val source by viewModel.currentSource.collectAsState()
     val anime by viewModel.currentAnime.collectAsState()
     val episode by viewModel.currentEpisode.collectAsState()
+    val animeCover by androidx.compose.runtime.produceState<ByteArray?>(null, anime?.id) {
+        value = anime?.let { eu.kanade.tachiyomi.util.system.CoverImage.load(context, "anime${it.id}", it) }
+    }
     val activeProfile = remember(source?.id, anime?.id, source?.lang) {
         dictionaryPreferences.profileResolver.resolve(
             animeId = anime?.id ?: 0L,
@@ -235,6 +238,7 @@ internal fun PlayerVideoOcrOverlay(
                     mediaInfo = MediaInfo(
                         mangaTitle = anime?.title.orEmpty(),
                         chapterName = episode?.name.orEmpty(),
+                        coverBytes = animeCover,
                     ),
                     onRequestAnimatedScene = { viewModel.captureVideoOcrAnimatedForAnki() },
                     mediaRequest = mediaRequest,

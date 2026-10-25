@@ -2,6 +2,14 @@ package chimahon.novel.audiobook
 
 import android.content.Context
 import android.content.Intent
+import chimahon.anki.AnkiSentenceAudioFailure
+import chimahon.anki.AnkiSentenceAudioPreparation
+import chimahon.anki.AnkiSentenceAudioSource
+import chimahon.anki.LazyAnkiSentenceAudioProvider
+import com.arthenica.ffmpegkit.FFmpegKitConfig
+import eu.kanade.tachiyomi.ui.player.mining.FfmpegCommandResult
+import eu.kanade.tachiyomi.ui.player.mining.FfmpegRunner
+import java.io.File
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
@@ -353,6 +361,46 @@ class AudiobookController(
         }
     }
 
+    // ---------------------------------------------------------------- anki
+
+    /** Cuts the audio of [line] (with a little padding) for the Anki sentence-audio field. */
+    fun sentenceAudioProvider(line: SrtLine): LazyAnkiSentenceAudioProvider? {
+        val audio = state.audioUri?.let(Uri::parse) ?: return null
+        val appContext = context.applicationContext
+        return LazyAnkiSentenceAudioProvider {
+            withContext<AnkiSentenceAudioPreparation>(Dispatchers.IO) {
+                val out = File(appContext.cacheDir, "chimahon_dial_${System.currentTimeMillis()}.m4a")
+                try {
+                    val input = FFmpegKitConfig.getSafParameterForRead(appContext, audio)
+                        ?: return@withContext AnkiSentenceAudioPreparation.Unavailable(
+                            AnkiSentenceAudioFailure.SOURCE_UNAVAILABLE,
+                        )
+                    val start = (line.startMs - CLIP_PAD_MS).coerceAtLeast(0L)
+                    val end = line.endMs + CLIP_PAD_MS
+                    val args = arrayOf(
+                        "-ss", "%.3f".format(java.util.Locale.US, start / 1000.0),
+                        "-t", "%.3f".format(java.util.Locale.US, (end - start) / 1000.0),
+                        "-i", input,
+                        "-vn", "-sn", "-dn",
+                        "-c:a", "aac", "-b:a", "128k",
+                        "-y", out.absolutePath,
+                    )
+                    val result = FfmpegRunner.ffmpeg(args)
+                    if (result !is FfmpegCommandResult.Success || !out.isFile || out.length() <= 0L) {
+                        return@withContext AnkiSentenceAudioPreparation.Unavailable(
+                            AnkiSentenceAudioFailure.EXTRACTION_FAILED,
+                        )
+                    }
+                    AnkiSentenceAudioPreparation.Ready(
+                        AnkiSentenceAudioSource.fromBytes(out.readBytes(), "m4a"),
+                    )
+                } finally {
+                    out.delete()
+                }
+            }
+        }
+    }
+
     // ---------------------------------------------------------------- lifecycle
 
     private fun persist() {
@@ -377,6 +425,7 @@ class AudiobookController(
 
     companion object {
         private const val TAIL_MS = 120L
+        private const val CLIP_PAD_MS = 100L
         private const val POLL_MS = 20L
         private const val SEEK_TIMEOUT_MS = 2000L
         val SPEEDS = listOf(0.75f, 0.9f, 1f, 1.1f, 1.25f, 1.5f)

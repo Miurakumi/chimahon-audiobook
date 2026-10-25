@@ -869,8 +869,11 @@ class ReaderActivity : BaseActivity() {
 
                                 withContext(Dispatchers.Main) {
                                 val state = viewModel.state.value
+                                val cover = state.manga?.let {
+                                    eu.kanade.tachiyomi.util.system.CoverImage.load(this@ReaderActivity, "manga${it.id}", it)
+                                }
                                 val mediaInfo = if (state.manga != null && state.currentChapter != null) {
-                                    chimahon.MediaInfo(mangaTitle = state.manga!!.title, chapterName = state.currentChapter!!.chapter.name)
+                                    chimahon.MediaInfo(mangaTitle = state.manga!!.title, chapterName = state.currentChapter!!.chapter.name, coverBytes = cover)
                                 } else null
                                 ensureOcrResources()
                                 ocrPopupState = OcrPopupState(
@@ -928,8 +931,11 @@ class ReaderActivity : BaseActivity() {
 
                                 withContext(Dispatchers.Main) {
                                 val state = viewModel.state.value
+                                val cover = state.manga?.let {
+                                    eu.kanade.tachiyomi.util.system.CoverImage.load(this@ReaderActivity, "manga${it.id}", it)
+                                }
                                 val mediaInfo = if (state.manga != null && state.currentChapter != null) {
-                                    chimahon.MediaInfo(mangaTitle = state.manga!!.title, chapterName = state.currentChapter!!.chapter.name)
+                                    chimahon.MediaInfo(mangaTitle = state.manga!!.title, chapterName = state.currentChapter!!.chapter.name, coverBytes = cover)
                                 } else null
                                 ensureOcrResources()
                                 ocrPopupState = OcrPopupState(

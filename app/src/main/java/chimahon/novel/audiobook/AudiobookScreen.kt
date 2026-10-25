@@ -115,7 +115,12 @@ fun AudiobookScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val controller = remember(bookKey) { AudiobookController(context, bookKey, scope) }
-    DisposableEffect(controller) { onDispose { controller.release() } }
+    DisposableEffect(controller) {
+        onDispose {
+            AudiobookMining.provider = null
+            controller.release()
+        }
+    }
     val fontFamily: FontFamily? = remember(fontName, fontUrl) {
         when {
             fontUrl != null -> runCatching {
@@ -399,6 +404,7 @@ private fun Dial(
                         val word = wordFrom(line.text, offset)
                         if (word.isNotBlank()) {
                             controller.pause()
+                            AudiobookMining.provider = controller.sentenceAudioProvider(line)
                             onLookup(
                                 word,
                                 line.text,

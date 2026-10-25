@@ -365,6 +365,26 @@ class ChimaReaderActivity : NovelReaderActivity() {
         )
     }
 
+    /** Cover of the open book: the stored cover file/URL, or the one inside the EPUB. */
+    private suspend fun loadNovelCover(): ByteArray? {
+        val meta = bookMetadata ?: return null
+        val key = "novel${meta.id}"
+        val stored = meta.cover?.takeIf { it.isNotBlank() }
+        if (stored != null && stored.startsWith("http")) {
+            eu.kanade.tachiyomi.util.system.CoverImage.load(this, key, stored)?.let { return it }
+        }
+        val file = stored?.removePrefix("file://")?.let(::java.io.File)?.takeIf { it.isFile }
+            ?: withContext(Dispatchers.IO) {
+                runCatching {
+                    val dir = chimahon.novel.data.BookStorage.getBookDirectory(this@ChimaReaderActivity, meta.folder ?: meta.id)
+                    chimahon.novel.data.BookStorage.loadEpub(dir).coverPath
+                        ?.let { java.io.File(dir, it) }
+                        ?.takeIf { it.isFile }
+                }.getOrNull()
+            }
+        return file?.let { eu.kanade.tachiyomi.util.system.CoverImage.loadFile(key, it) }
+    }
+
     override suspend fun recognizeImage(bitmap: Bitmap, language: OcrLanguage): List<OcrResult> {
         val profileLanguage = getOrRefreshLookupPaths().first.languageCode
         val resolvedLanguage = OcrLanguage.entries.firstOrNull {
@@ -491,10 +511,14 @@ class ChimaReaderActivity : NovelReaderActivity() {
             isPopupActive = false
         }
 
+        val novelCover by androidx.compose.runtime.produceState<ByteArray?>(null, bookMetadata?.id) {
+            value = loadNovelCover()
+        }
         val mediaInfo = readerViewModel?.let { vm ->
             chimahon.MediaInfo(
                 mangaTitle = vm.document.title ?: "",
-                chapterName = vm.getCurrentChapterTitle() ?: ""
+                chapterName = vm.getCurrentChapterTitle() ?: "",
+                coverBytes = novelCover,
             )
         }
         eu.kanade.presentation.theme.TachiyomiTheme {
@@ -526,6 +550,8 @@ class ChimaReaderActivity : NovelReaderActivity() {
                     activeProfile = if (popupVisible) getOrRefreshLookupPaths().first else popupState.activeProfile,
                     type = "novel",
                     mediaInfo = mediaInfo,
+                    mediaRequest = chimahon.novel.audiobook.AudiobookMining.provider
+                        ?.let { chimahon.anki.AnkiMediaRequest(it) },
                     onRequestScreenshot = if (popupState.screenshot != null) {
                         { popupState.screenshot }
                     } else {

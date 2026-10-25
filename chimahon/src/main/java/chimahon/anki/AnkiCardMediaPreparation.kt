@@ -20,6 +20,7 @@ internal data class PreparedAnkiCardMedia(
     val wordAudio: PreparedAnkiMediaPayload?,
     val dictionaryMedia: List<PreparedDictionaryMedia>,
     val sentenceAudio: AnkiSentenceAudioPreparation?,
+    val cover: PreparedAnkiMediaPayload? = null,
 )
 
 internal data class CommittedAnkiCardMedia(
@@ -27,6 +28,7 @@ internal data class CommittedAnkiCardMedia(
     val wordAudioFilename: String?,
     val dictionaryReplacementByPlaceholder: Map<String, String>,
     val sentenceAudio: StoredSentenceAudio,
+    val coverFilename: String? = null,
 )
 
 /**
@@ -58,5 +60,6 @@ internal suspend fun commitPreparedAnkiCardMedia(
         wordAudioFilename = storeOptional(prepared.wordAudio),
         dictionaryReplacementByPlaceholder = dictionaryReplacements,
         sentenceAudio = AnkiSentenceAudioCommitter(storeSentenceAudio).store(prepared.sentenceAudio),
+        coverFilename = storeOptional(prepared.cover),
     )
 }

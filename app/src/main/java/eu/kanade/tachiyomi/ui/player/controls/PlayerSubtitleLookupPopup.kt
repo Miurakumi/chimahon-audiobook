@@ -61,6 +61,9 @@ internal fun PlayerSubtitleLookupPopup(
     val repository = remember { Injekt.get<DictionaryRepository>() }
     val anime by viewModel.currentAnime.collectAsState()
     val episode by viewModel.currentEpisode.collectAsState()
+    val animeCover by androidx.compose.runtime.produceState<ByteArray?>(null, anime?.id) {
+        value = anime?.let { eu.kanade.tachiyomi.util.system.CoverImage.load(context, "anime${it.id}", it) }
+    }
     val source by viewModel.currentSource.collectAsState()
     val activeProfile = remember(anime?.id, source?.id, source?.lang) {
         dictionaryPreferences.profileResolver.resolve(
@@ -112,6 +115,7 @@ internal fun PlayerSubtitleLookupPopup(
         mediaInfo = MediaInfo(
             mangaTitle = anime?.title.orEmpty(),
             chapterName = episode?.name.orEmpty(),
+            coverBytes = animeCover,
         ),
         onRequestScreenshot = {
             viewModel.captureVideoFrameForOcr()

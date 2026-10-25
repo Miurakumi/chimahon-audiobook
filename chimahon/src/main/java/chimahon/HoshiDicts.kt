@@ -54,6 +54,8 @@ data class Cloze(
 data class MediaInfo(
     val mangaTitle: String,
     val chapterName: String,
+    /** Cover image (JPEG/PNG/WebP bytes) of the book/manga/anime, used by the {cover} marker. */
+    val coverBytes: ByteArray? = null,
 )
 
 data class TermResult(
