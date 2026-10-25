@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -469,7 +470,7 @@ private fun Controls(controller: AudiobookController) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
         LinearProgressIndicator(
             progress = { if (total > 0) (active + 1f) / total else 0f },
@@ -501,33 +502,63 @@ private fun Controls(controller: AudiobookController) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = { controller.cycleMode() }) {
+            TextButton(
+                onClick = { controller.cycleMode() },
+                modifier = Modifier.height(56.dp),
+                contentPadding = PaddingValues(horizontal = 6.dp),
+            ) {
                 Text(
                     when (controller.mode) {
                         PlayMode.ALL -> "Todas"
                         PlayMode.QUOTES -> "Citas"
                         PlayMode.MANUAL -> "Manual"
                     },
+                    style = MaterialTheme.typography.titleMedium,
                 )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { controller.step(-1) }) {
-                    Icon(Icons.Filled.SkipPrevious, contentDescription = "Línea anterior")
-                }
-                FilledIconButton(onClick = { controller.togglePlay() }) {
+                IconButton(
+                    onClick = { controller.step(-1) },
+                    modifier = Modifier.size(56.dp),
+                ) {
                     Icon(
+                        Icons.Filled.SkipPrevious,
+                        contentDescription = "Línea anterior",
+                        modifier = Modifier.size(34.dp),
+                    )
+                }
+                FilledIconButton(
+                    onClick = { controller.togglePlay() },
+                    modifier = Modifier.size(72.dp),
+                ) {
+                    Icon(
+                        modifier = Modifier.size(42.dp),
                         imageVector = if (controller.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                         contentDescription = if (controller.isPlaying) "Pausar" else "Reproducir línea",
                     )
                 }
-                IconButton(onClick = { controller.step(1) }) {
-                    Icon(Icons.Filled.SkipNext, contentDescription = "Línea siguiente")
+                IconButton(
+                    onClick = { controller.step(1) },
+                    modifier = Modifier.size(56.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.SkipNext,
+                        contentDescription = "Línea siguiente",
+                        modifier = Modifier.size(34.dp),
+                    )
                 }
             }
 
-            TextButton(onClick = { controller.cycleSpeed() }) {
-                Text("${controller.state.speed}x")
+            TextButton(
+                onClick = { controller.cycleSpeed() },
+                modifier = Modifier.height(56.dp),
+                contentPadding = PaddingValues(horizontal = 6.dp),
+            ) {
+                Text(
+                    "${controller.state.speed}x",
+                    style = MaterialTheme.typography.titleMedium,
+                )
             }
         }
     }
