@@ -533,9 +533,12 @@ fun ReaderScreen(
         // by the activity after this screen, so it appears above the dial.
         if (showAudiobook && readyVm != null) {
             androidx.activity.compose.BackHandler(enabled = true) { showAudiobook = false }
-            ReaderThemedArea(readyVm.getReaderSettings(context)) {
+            val audiobookSettings = readyVm.getReaderSettings(context)
+            ReaderThemedArea(audiobookSettings) {
                 chimahon.novel.audiobook.AudiobookScreen(
                     bookKey = book.folder ?: book.id,
+                    fontName = audiobookSettings.selectedFont,
+                    fontUrl = audiobookSettings.fontUrl,
                     title = readyVm.document.title().orEmpty(),
                     isPopupActive = isPopupActive,
                     onLookup = onAudiobookLookupRequested,

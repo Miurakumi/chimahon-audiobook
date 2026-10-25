@@ -1,5 +1,6 @@
 package chimahon.novel.audiobook
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateDpAsState
@@ -25,6 +26,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
@@ -58,6 +60,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +69,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -95,6 +100,8 @@ private class AlignGuard {
 fun AudiobookScreen(
     bookKey: String,
     title: String,
+    fontName: String,
+    fontUrl: String?,
     isPopupActive: Boolean,
     onLookup: (String, String, Int, Float, Float, Float, Float) -> Unit,
     onDismissPopup: () -> Unit,
@@ -105,6 +112,16 @@ fun AudiobookScreen(
     val scope = rememberCoroutineScope()
     val controller = remember(bookKey) { AudiobookController(context, bookKey, scope) }
     DisposableEffect(controller) { onDispose { controller.release() } }
+    val fontFamily: FontFamily? = remember(fontName, fontUrl) {
+        when {
+            fontUrl != null -> runCatching {
+                FontFamily(Font(File(Uri.parse(fontUrl).path.orEmpty())))
+            }.getOrNull()
+            fontName.contains("Sans", ignoreCase = true) -> FontFamily.SansSerif
+            fontName.contains("Serif", ignoreCase = true) -> FontFamily.Serif
+            else -> null
+        }
+    }
 
     // Surface sets the default text/icon color from the reader theme (otherwise they are black).
     Surface(
@@ -138,7 +155,9 @@ fun AudiobookScreen(
                 style = MaterialTheme.typography.titleMedium,
             )
             if (controller.hasFiles) {
-                TextButton(onClick = { controller.changeFiles() }) { Text("Archivos") }
+                IconButton(onClick = { controller.changeFiles() }) {
+                    Icon(Icons.Filled.Folder, contentDescription = "Cambiar archivos")
+                }
             }
         }
 
@@ -156,6 +175,7 @@ fun AudiobookScreen(
             else -> {
                 Dial(
                     controller = controller,
+                    fontFamily = fontFamily,
                     isPopupActive = isPopupActive,
                     onLookup = onLookup,
                     onDismissPopup = onDismissPopup,
@@ -224,6 +244,7 @@ private fun SetupPane(controller: AudiobookController, modifier: Modifier = Modi
 @Composable
 private fun Dial(
     controller: AudiobookController,
+    fontFamily: FontFamily?,
     isPopupActive: Boolean,
     onLookup: (String, String, Int, Float, Float, Float, Float) -> Unit,
     onDismissPopup: () -> Unit,
@@ -353,6 +374,7 @@ private fun Dial(
 
                 DialLine(
                     text = line.text,
+                    fontFamily = fontFamily,
                     active = active,
                     fog = fog,
                     onJump = {
@@ -406,6 +428,7 @@ private fun wordFrom(text: String, offset: Int): String {
 @Composable
 private fun DialLine(
     text: String,
+    fontFamily: FontFamily?,
     active: Boolean,
     fog: Float,
     onJump: () -> Unit,
@@ -428,6 +451,7 @@ private fun DialLine(
         Text(
             text = text,
             fontSize = 22.sp,
+            fontFamily = fontFamily,
             lineHeight = 34.sp,
             fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
             textAlign = TextAlign.Center,
