@@ -62,11 +62,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 
-/** Plain mutable flag that does not trigger recomposition. */
-private class Flag(var value: Boolean = false)
+/**
+ * Bookkeeping for the list alignment, kept out of Compose state on purpose.
+ * [count] is how many alignment animations are running (a counter, not a boolean, so an
+ * old cancelled animation cannot switch the flag off while a newer one is still running).
+ */
+private class AlignGuard {
+    var count = 0
+    var job: Job? = null
+    val active: Boolean get() = count > 0
+}
 
 /**
  * Full-screen audiobook dial, shown on top of the EPUB reader.
@@ -216,8 +226,9 @@ private fun Dial(
     onDismissPopup: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val scope = rememberCoroutineScope()
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = controller.activeIndex)
-    val programmatic = remember { Flag() }
+    val programmatic = remember { AlignGuard() }
 
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val density = LocalDensity.current
@@ -240,12 +251,20 @@ private fun Dial(
         }
 
         suspend fun alignTo(index: Int) {
-            programmatic.value = true
+            programmatic.count++
             try {
                 listState.animateScrollToItem(index)
             } finally {
-                programmatic.value = false
+                programmatic.count--
             }
+        }
+
+        // Alignment runs in its own coroutine. If the user touches the list mid-animation,
+        // Android cancels the animation; that cancellation must stay inside this job and
+        // never reach the effects below, or they would stop listening for good.
+        fun launchAlign(index: Int) {
+            programmatic.job?.cancel()
+            programmatic.job = scope.launch { alignTo(index) }
         }
 
         // The LaunchedEffect on controller.activeIndex (below) moves the list to the new line.
@@ -258,10 +277,10 @@ private fun Dial(
             snapshotFlow { listState.isScrollInProgress }
                 .distinctUntilChanged()
                 .collect { scrolling ->
-                    if (!scrolling && !programmatic.value) {
+                    if (!scrolling && !programmatic.active) {
                         val index = nearestIndex() ?: return@collect
                         controller.onSettled(index)
-                        alignTo(index)
+                        launchAlign(index)
                     }
                 }
         }
@@ -337,7 +356,7 @@ private fun Dial(
             val visible = listState.layoutInfo.visibleItemsInfo
             val aligned = visible.firstOrNull { it.index == index }
                 ?.let { abs((it.offset - listState.layoutInfo.viewportStartOffset) - topPadPx) < 2f } == true
-            if (!aligned && !listState.isScrollInProgress && !programmatic.value) alignTo(index)
+            if (!aligned && !listState.isScrollInProgress && !programmatic.active) launchAlign(index)
         }
     }
 }
