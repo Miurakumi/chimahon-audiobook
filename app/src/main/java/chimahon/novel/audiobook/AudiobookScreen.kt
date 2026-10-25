@@ -2,6 +2,7 @@ package chimahon.novel.audiobook
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -41,6 +42,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -305,12 +307,26 @@ private fun Dial(
                 }
         }
 
-        // The viewer strip.
+        // The viewer strip. Its height follows the line that is currently under it, so long
+        // lines (several rows) are always fully covered and short ones do not get extra space.
+        val stripHeightPx by remember(topPadPx) {
+            derivedStateOf {
+                val info = listState.layoutInfo
+                val viewportStart = info.viewportStartOffset
+                info.visibleItemsInfo
+                    .minByOrNull { abs((it.offset - viewportStart) - topPadPx) }
+                    ?.size ?: 0
+            }
+        }
+        val stripHeight by animateDpAsState(
+            targetValue = maxOf(with(density) { stripHeightPx.toDp() }, 56.dp),
+            label = "strip",
+        )
         Box(
             modifier = Modifier
                 .offset(y = topPad)
                 .fillMaxWidth()
-                .height(72.dp)
+                .height(stripHeight)
                 .padding(horizontal = 10.dp)
                 .background(
                     MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
