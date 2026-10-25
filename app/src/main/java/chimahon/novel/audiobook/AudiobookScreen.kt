@@ -68,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import java.io.File
 import kotlinx.coroutines.Job
@@ -102,6 +103,9 @@ fun AudiobookScreen(
     title: String,
     fontName: String,
     fontUrl: String?,
+    fontSize: Float,
+    lineHeight: Float,
+    characterSpacing: Float,
     isPopupActive: Boolean,
     onLookup: (String, String, Int, Float, Float, Float, Float) -> Unit,
     onDismissPopup: () -> Unit,
@@ -176,6 +180,9 @@ fun AudiobookScreen(
                 Dial(
                     controller = controller,
                     fontFamily = fontFamily,
+                    fontSize = fontSize,
+                    lineHeight = lineHeight,
+                    characterSpacing = characterSpacing,
                     isPopupActive = isPopupActive,
                     onLookup = onLookup,
                     onDismissPopup = onDismissPopup,
@@ -245,6 +252,9 @@ private fun SetupPane(controller: AudiobookController, modifier: Modifier = Modi
 private fun Dial(
     controller: AudiobookController,
     fontFamily: FontFamily?,
+    fontSize: Float,
+    lineHeight: Float,
+    characterSpacing: Float,
     isPopupActive: Boolean,
     onLookup: (String, String, Int, Float, Float, Float, Float) -> Unit,
     onDismissPopup: () -> Unit,
@@ -375,6 +385,9 @@ private fun Dial(
                 DialLine(
                     text = line.text,
                     fontFamily = fontFamily,
+                    fontSize = fontSize,
+                    lineHeight = lineHeight,
+                    characterSpacing = characterSpacing,
                     active = active,
                     fog = fog,
                     onJump = {
@@ -429,6 +442,9 @@ private fun wordFrom(text: String, offset: Int): String {
 private fun DialLine(
     text: String,
     fontFamily: FontFamily?,
+    fontSize: Float,
+    lineHeight: Float,
+    characterSpacing: Float,
     active: Boolean,
     fog: Float,
     onJump: () -> Unit,
@@ -450,9 +466,10 @@ private fun DialLine(
     ) {
         Text(
             text = text,
-            fontSize = 22.sp,
+            fontSize = fontSize.sp,
             fontFamily = fontFamily,
-            lineHeight = 34.sp,
+            lineHeight = (fontSize * lineHeight).sp,
+            letterSpacing = characterSpacing.em,
             fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onBackground,
