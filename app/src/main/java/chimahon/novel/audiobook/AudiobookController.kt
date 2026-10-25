@@ -215,7 +215,7 @@ class AudiobookController(
             delay(700)
             if (pendingPlay && !isPlaying) startPlayer(mp)
         }
-        runCatching { mp.seekTo(line.startMs.toInt(), MediaPlayer.SEEK_CLOSEST) }
+        runCatching { mp.seekTo(line.startMs, MediaPlayer.SEEK_CLOSEST) }
             .onFailure { startPlayer(mp) }
     }
 
