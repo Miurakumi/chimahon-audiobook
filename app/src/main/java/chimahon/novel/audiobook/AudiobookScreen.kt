@@ -250,6 +250,13 @@ private fun Dial(
                 ?.index
         }
 
+        /** How far [index] is from the viewer strip, in pixels (null if not on screen). */
+        fun misalignment(index: Int): Float? {
+            val info = listState.layoutInfo
+            val item = info.visibleItemsInfo.firstOrNull { it.index == index } ?: return null
+            return (item.offset - info.viewportStartOffset) - topPadPx
+        }
+
         suspend fun alignTo(index: Int) {
             programmatic.count++
             try {
@@ -280,7 +287,10 @@ private fun Dial(
                     if (!scrolling && !programmatic.active) {
                         val index = nearestIndex() ?: return@collect
                         controller.onSettled(index)
-                        launchAlign(index)
+                        // Aligning always flips "scrolling" on and off, which would trigger
+                        // this very block again: only move the list if it is really off.
+                        val off = misalignment(index)
+                        if (off == null || abs(off) >= 1.5f) launchAlign(index)
                     }
                 }
         }
@@ -289,7 +299,10 @@ private fun Dial(
         LaunchedEffect(listState, isPopupActive) {
             snapshotFlow { listState.isScrollInProgress }
                 .distinctUntilChanged()
-                .collect { scrolling -> if (scrolling && isPopupActive) onDismissPopup() }
+                .collect { scrolling ->
+                    // Only the user's own scrolling closes the popup, not the automatic snap.
+                    if (scrolling && isPopupActive && !programmatic.active) onDismissPopup()
+                }
         }
 
         // The viewer strip.
@@ -448,6 +461,16 @@ private fun Controls(controller: AudiobookController) {
                 .fillMaxWidth()
                 .padding(horizontal = 6.dp),
         )
+        if (controller.debug.isNotBlank()) {
+            Text(
+                text = controller.debug,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         Text(
             text = "${active + 1} / $total",
             modifier = Modifier

@@ -51,6 +51,10 @@ class AudiobookController(
     var error by mutableStateOf<String?>(null)
         private set
 
+    /** One-line status of the audio, shown on screen to help find problems. */
+    var debug by mutableStateOf("")
+        private set
+
     val mode: PlayMode
         get() = runCatching { PlayMode.valueOf(state.mode) }.getOrDefault(PlayMode.ALL)
 
@@ -62,6 +66,8 @@ class AudiobookController(
     private var watchdogJob: Job? = null
     private var currentEndMs = 0L
     private var pendingPlay = false
+    private var seeking = false
+    private var appliedSpeed = 1f
 
     init {
         state = AudiobookStore.load(context, bookKey)
@@ -146,6 +152,7 @@ class AudiobookController(
                     true
                 }
                 player = mp
+                appliedSpeed = 1f
                 lines = parsed
                 activeIndex = activeIndex.coerceIn(0, parsed.lastIndex)
                 ready = true
@@ -199,37 +206,56 @@ class AudiobookController(
 
     /** Seek to the start of [index], play until its end, then pause. */
     fun playLine(index: Int) {
-        val mp = player ?: return
-        val line = lines.getOrNull(index) ?: return
-        pause()
+        val mp = player
+        val line = lines.getOrNull(index)
+        if (mp == null || line == null) {
+            debug = "sin reproductor listo"
+            return
+        }
+        pause("nueva línea")
         currentEndMs = line.endMs + TAIL_MS
         pendingPlay = true
+        seeking = true
+        debug = "buscando ${line.startMs} ms"
         mp.setOnSeekCompleteListener {
+            seeking = false
             watchdogJob?.cancel()
             if (pendingPlay) startPlayer(mp)
         }
-        // Some devices never report seek completion when the target equals the current
-        // position, so start anyway after a short wait.
+        // Long files can take a while to seek, and some devices never report completion
+        // when the target equals the current position: start anyway after a wait.
         watchdogJob?.cancel()
         watchdogJob = scope.launch {
-            delay(700)
-            if (pendingPlay && !isPlaying) startPlayer(mp)
+            delay(SEEK_TIMEOUT_MS)
+            if (pendingPlay && seeking) {
+                seeking = false
+                startPlayer(mp)
+            }
         }
         runCatching { mp.seekTo(line.startMs, MediaPlayer.SEEK_CLOSEST) }
-            .onFailure { startPlayer(mp) }
+            .onFailure {
+                seeking = false
+                debug = "seek falló: ${it.message}"
+                startPlayer(mp)
+            }
     }
 
     private fun startPlayer(mp: MediaPlayer) {
         pendingPlay = false
         runCatching {
-            // Speed is applied right before start(): changing it while paused can
-            // start playback by itself on some Android versions.
-            mp.playbackParams = mp.playbackParams.setSpeed(state.speed)
+            // Changing the speed on a prepared MediaPlayer also starts it, so it is only
+            // touched when the speed really changed; start() below is then harmless.
+            if (appliedSpeed != state.speed) {
+                mp.playbackParams = mp.playbackParams.setSpeed(state.speed)
+                appliedSpeed = state.speed
+            }
             mp.start()
             isPlaying = true
+            debug = "suena: ${mp.currentPosition} ms -> ${currentEndMs} ms"
             startPolling(mp)
         }.onFailure {
             isPlaying = false
+            debug = "no arrancó: ${it.message ?: it.javaClass.simpleName}"
             error = "No se pudo reproducir (${it.message ?: it.javaClass.simpleName})"
         }
     }
@@ -238,22 +264,26 @@ class AudiobookController(
         pollJob?.cancel()
         pollJob = scope.launch {
             while (isActive) {
-                val position = runCatching { mp.currentPosition }.getOrDefault(Int.MAX_VALUE)
-                if (position >= currentEndMs) {
-                    pause()
-                    break
+                if (!seeking) {
+                    val position = runCatching { mp.currentPosition }.getOrDefault(Int.MAX_VALUE)
+                    if (position >= currentEndMs) {
+                        pause("fin de la línea (pos $position ms)")
+                        break
+                    }
                 }
                 delay(POLL_MS)
             }
         }
     }
 
-    fun pause() {
+    fun pause(reason: String = "pausa") {
         pendingPlay = false
+        seeking = false
         watchdogJob?.cancel()
         pollJob?.cancel()
         runCatching { if (player?.isPlaying == true) player?.pause() }
         isPlaying = false
+        debug = reason
     }
 
     /** Reload the files after an error (or after permission was lost and re-granted). */
@@ -278,12 +308,11 @@ class AudiobookController(
     fun onSettled(index: Int) {
         if (index !in lines.indices) return
         val changed = index != activeIndex
+        if (!changed) return
         activeIndex = index
         persist()
-        if (changed) {
-            pause()
-            if (shouldAutoPlay(lines[index])) playLine(index)
-        }
+        pause("nueva línea")
+        if (shouldAutoPlay(lines[index])) playLine(index) else debug = "modo ${mode.name}: no suena sola"
     }
 
     /** Explicit jump (tap on a line, previous/next). [forcePlay] ignores the mode. */
@@ -315,7 +344,12 @@ class AudiobookController(
         state = state.copy(speed = next)
         persist()
         if (isPlaying) {
-            runCatching { player?.let { it.playbackParams = it.playbackParams.setSpeed(next) } }
+            runCatching {
+                player?.let {
+                    it.playbackParams = it.playbackParams.setSpeed(next)
+                    appliedSpeed = next
+                }
+            }
         }
     }
 
@@ -344,6 +378,7 @@ class AudiobookController(
     companion object {
         private const val TAIL_MS = 120L
         private const val POLL_MS = 20L
+        private const val SEEK_TIMEOUT_MS = 2000L
         val SPEEDS = listOf(0.75f, 0.9f, 1f, 1.1f, 1.25f, 1.5f)
     }
 }
