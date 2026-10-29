@@ -27,13 +27,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -115,6 +120,10 @@ fun AudiobookScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val controller = remember(bookKey) { AudiobookController(context, bookKey, scope) }
+    var showMusicDialog by remember { mutableStateOf(false) }
+    if (showMusicDialog) {
+        MusicDialog(music = controller.music, onDismiss = { showMusicDialog = false })
+    }
     DisposableEffect(controller) {
         onDispose {
             AudiobookMining.provider = null
@@ -163,6 +172,9 @@ fun AudiobookScreen(
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.titleMedium,
             )
+            IconButton(onClick = { showMusicDialog = true }) {
+                Icon(Icons.Filled.MusicNote, contentDescription = "Música de fondo")
+            }
             if (controller.hasFiles) {
                 IconButton(onClick = { controller.changeFiles() }) {
                     Icon(Icons.Filled.Folder, contentDescription = "Cambiar archivos")
@@ -509,6 +521,7 @@ private fun DialLine(
 
 // ------------------------------------------------------------------ controls
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Controls(controller: AudiobookController) {
     val total = controller.lines.size
@@ -598,5 +611,91 @@ private fun Controls(controller: AudiobookController) {
                 )
             }
         }
+
+        // Immersion mode: tap a mood to play its music, tap it again to turn it off.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Mood.entries.forEach { mood ->
+                FilterChip(
+                    selected = controller.music.mood == mood,
+                    onClick = { controller.music.select(mood) },
+                    label = {
+                        Text(
+                            mood.label,
+                            maxLines = 1,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        controller.music.message?.let {
+            Text(
+                it,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
     }
+}
+
+// ------------------------------------------------------------------ music settings
+
+@Composable
+private fun MusicDialog(music: BackgroundMusic, onDismiss: () -> Unit) {
+    var pending by remember { mutableStateOf<Mood?>(null) }
+    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        val mood = pending
+        if (uri != null && mood != null) music.setFolder(mood, uri)
+        pending = null
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Música de fondo") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    "Elegí una carpeta con tu música para cada clima. Suena una pista al azar de la carpeta.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Mood.entries.forEach { mood ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(mood.label, modifier = Modifier.weight(0.4f))
+                        TextButton(
+                            onClick = {
+                                pending = mood
+                                folderPicker.launch(null)
+                            },
+                            modifier = Modifier.weight(0.6f),
+                        ) {
+                            Text(
+                                music.folderName(mood) ?: "Elegir carpeta",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+                Text("Volumen", style = MaterialTheme.typography.labelMedium)
+                Slider(
+                    value = music.config.volume,
+                    onValueChange = { music.setVolume(it) },
+                    onValueChangeFinished = { music.commitVolume() },
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Listo") } },
+    )
 }

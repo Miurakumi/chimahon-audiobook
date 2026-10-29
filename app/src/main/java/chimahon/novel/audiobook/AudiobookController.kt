@@ -69,6 +69,9 @@ class AudiobookController(
     val hasFiles: Boolean
         get() = state.audioUri != null && state.srtUri != null
 
+    /** Background music (immersion mode), independent from the narration player. */
+    val music = BackgroundMusic(context, scope)
+
     private var player: MediaPlayer? = null
     private var pollJob: Job? = null
     private var watchdogJob: Job? = null
@@ -421,6 +424,7 @@ class AudiobookController(
         pause()
         persist()
         releasePlayer()
+        music.release()
     }
 
     companion object {
