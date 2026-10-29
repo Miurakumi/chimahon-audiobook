@@ -72,6 +72,16 @@ class AudiobookController(
     /** Background music (immersion mode), independent from the narration player. */
     val music = BackgroundMusic(context, scope)
 
+    /** Detects the mood of the book with a small on-device model ("Auto" button). */
+    val auto = AutoMood(context, scope) { labels ->
+        state = state.copy(moodLabels = labels)
+        persist()
+    }
+
+    /** True while the music follows the detected mood of the active line. */
+    var autoMusic by mutableStateOf(false)
+        private set
+
     private var player: MediaPlayer? = null
     private var pollJob: Job? = null
     private var watchdogJob: Job? = null
@@ -102,8 +112,13 @@ class AudiobookController(
             srtUri = uri.toString(),
             srtName = displayName(uri),
             lineIndex = if (changed) 0 else state.lineIndex,
+            moodLabels = if (changed) emptyList() else state.moodLabels,
         )
-        if (changed) activeIndex = 0
+        if (changed) {
+            activeIndex = 0
+            auto.reset()
+            autoMusic = false
+        }
         persist()
         if (hasFiles) load()
     }
@@ -115,6 +130,8 @@ class AudiobookController(
         ready = false
         error = null
         lines = emptyList()
+        auto.cancel()
+        autoMusic = false
         state = state.copy(audioUri = null, srtUri = null, audioName = null, srtName = null)
         persist()
     }
@@ -165,6 +182,7 @@ class AudiobookController(
                 player = mp
                 appliedSpeed = 1f
                 lines = parsed
+                auto.attach(parsed, state.moodLabels)
                 activeIndex = activeIndex.coerceIn(0, parsed.lastIndex)
                 ready = true
             } catch (e: Exception) {
@@ -322,6 +340,7 @@ class AudiobookController(
         if (!changed) return
         activeIndex = index
         persist()
+        applyAutoMood(index)
         pause("nueva línea")
         if (shouldAutoPlay(lines[index])) playLine(index) else debug = "modo ${mode.name}: no suena sola"
     }
@@ -331,8 +350,37 @@ class AudiobookController(
         if (index !in lines.indices) return
         activeIndex = index
         persist()
+        applyAutoMood(index)
         pause()
         if (forcePlay || shouldAutoPlay(lines[index])) playLine(index)
+    }
+
+    // ---------------------------------------------------------------- auto music
+
+    /** The "Auto" button: the music follows the mood detected for the active line. */
+    fun toggleAuto() {
+        if (autoMusic) {
+            autoMusic = false
+            return
+        }
+        if (!auto.hasResults) {
+            music.showMessage("Auto necesita el análisis del libro (ícono de música, arriba).")
+            return
+        }
+        music.showMessage(null)
+        autoMusic = true
+        applyAutoMood(activeIndex)
+    }
+
+    /** A tap on a mood button: manual choice, so Auto turns off. */
+    fun pickMood(mood: Mood) {
+        autoMusic = false
+        music.select(mood)
+    }
+
+    private fun applyAutoMood(index: Int) {
+        if (!autoMusic) return
+        auto.moodAt(index)?.let { music.switchTo(it) }
     }
 
     private fun shouldAutoPlay(line: SrtLine): Boolean = when (mode) {
@@ -424,6 +472,7 @@ class AudiobookController(
         pause()
         persist()
         releasePlayer()
+        auto.cancel()
         music.release()
     }
 

@@ -30,6 +30,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -87,6 +90,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
+/** How many chunks the "Analizar" button reads each time. */
+private const val AUTO_BATCH = 20
+
 /**
  * Bookkeeping for the list alignment, kept out of Compose state on purpose.
  * [count] is how many alignment animations are running (a counter, not a boolean, so an
@@ -128,7 +134,11 @@ fun AudiobookScreen(
     val controller = remember(bookKey) { AudiobookController(context, bookKey, scope) }
     var showMusicDialog by remember { mutableStateOf(false) }
     if (showMusicDialog) {
-        MusicDialog(music = controller.music, onDismiss = { showMusicDialog = false })
+        MusicDialog(
+            music = controller.music,
+            auto = controller.auto,
+            onDismiss = { showMusicDialog = false },
+        )
     }
     DisposableEffect(controller) {
         onDispose {
@@ -617,18 +627,26 @@ private fun Controls(controller: AudiobookController) {
             }
         }
 
-        // Immersion mode: tap a mood to play its music, tap it again to turn it off.
-        Row(
+        // Immersion mode: "Auto" follows the detected mood; a mood button picks one by hand
+        // (tap it again to turn the music off).
+        AutoButton(
+            selected = controller.autoMusic,
+            onClick = { controller.toggleAuto() },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 4.dp),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 5.dp),
             horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             Mood.entries.forEach { mood ->
                 MoodButton(
                     mood = mood,
                     selected = controller.music.mood == mood,
-                    onClick = { controller.music.select(mood) },
+                    onClick = { controller.pickMood(mood) },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -711,21 +729,67 @@ private fun MoodButton(
     }
 }
 
+/** The "Auto" toggle: same look as a mood button, with its own accent color. */
+@Composable
+private fun AutoButton(selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val accent = Color(0xFF7C6CF0)
+    val darkBase = Color(0xFF26262B)
+    val spec = tween<Color>(durationMillis = 350)
+    val background by animateColorAsState(
+        if (selected) lerp(darkBase, accent, 0.45f) else darkBase,
+        animationSpec = spec,
+        label = "autoBackground",
+    )
+    val border by animateColorAsState(
+        if (selected) accent else Color(0xFF3A3A41),
+        animationSpec = spec,
+        label = "autoBorder",
+    )
+    val textColor by animateColorAsState(
+        if (selected) Color(0xFFF7F7FA) else Color(0xFF9A9AA3),
+        animationSpec = spec,
+        label = "autoText",
+    )
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        modifier = modifier
+            .height(36.dp)
+            .clip(shape)
+            .background(background)
+            .border(if (selected) 2.dp else 1.dp, border, shape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            if (selected) "Auto · activado" else "Auto",
+            color = textColor,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        )
+    }
+}
+
 // ------------------------------------------------------------------ music settings
 
 @Composable
-private fun MusicDialog(music: BackgroundMusic, onDismiss: () -> Unit) {
+private fun MusicDialog(music: BackgroundMusic, auto: AutoMood, onDismiss: () -> Unit) {
     var pending by remember { mutableStateOf<Mood?>(null) }
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         val mood = pending
         if (uri != null && mood != null) music.setFolder(mood, uri)
         pending = null
     }
+    val modelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) auto.importModel(uri)
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Música de fondo") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
                 Text(
                     "Elegí una carpeta con tu música para cada clima. Suena una pista al azar de la carpeta.",
                     style = MaterialTheme.typography.bodySmall,
@@ -757,6 +821,85 @@ private fun MusicDialog(music: BackgroundMusic, onDismiss: () -> Unit) {
                     onValueChange = { music.setVolume(it) },
                     onValueChangeFinished = { music.commitVolume() },
                 )
+
+                // ---- Auto (experimental): a small on-device model reads the SRT.
+                Text("Auto (experimental)", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Un modelo chico (Qwen3 0.6B, unos 330 MB) corre en el celu y lee el SRT para detectar el clima de cada parte.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                val progress = auto.downloadProgress
+                when {
+                    progress != null -> {
+                        if (progress >= 0f) {
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Text("Copiando/bajando el modelo… ${(progress * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            Text("Copiando/bajando el modelo…", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    !auto.modelReady -> {
+                        Button(onClick = { auto.downloadModel() }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Bajar el modelo")
+                        }
+                        TextButton(
+                            onClick = { modelPicker.launch(arrayOf("*/*")) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Elegir archivo del modelo") }
+                    }
+                    else -> Text("Modelo listo.", style = MaterialTheme.typography.bodySmall)
+                }
+                if (auto.modelReady) {
+                    Text(
+                        "Analizadas ${auto.analyzedCount} de ${auto.chunks.size} tandas" +
+                            (auto.secondsPerChunk?.let { " · ${"%.1f".format(it)} s por tanda" } ?: ""),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    if (auto.running) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        OutlinedButton(onClick = { auto.cancel() }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Parar análisis")
+                        }
+                    } else {
+                        Button(
+                            onClick = { auto.analyze(AUTO_BATCH) },
+                            enabled = auto.chunks.isNotEmpty(),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Analizar $AUTO_BATCH tandas") }
+                        OutlinedButton(
+                            onClick = { auto.analyze(null) },
+                            enabled = auto.chunks.isNotEmpty(),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Analizar todo el libro") }
+                    }
+                    if (auto.chunks.isEmpty()) {
+                        Text("Cargá primero el audio y el SRT del libro.", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                auto.status?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                if (auto.analyzedCount > 0) {
+                    Text("Lo que detectó:", style = MaterialTheme.typography.labelMedium)
+                    LazyColumn(modifier = Modifier.height(160.dp)) {
+                        items(auto.chunks.indices.filter { auto.labels[it].isNotEmpty() }) { i ->
+                            val chunk = auto.chunks[i]
+                            val mood = auto.labelOf(i)
+                            Text(
+                                "${chunk.start + 1}–${chunk.end + 1} · ${mood?.label ?: "sin clima"} · " +
+                                    chunk.text.replace('\n', ' ').take(24),
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(vertical = 2.dp),
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Listo") } },

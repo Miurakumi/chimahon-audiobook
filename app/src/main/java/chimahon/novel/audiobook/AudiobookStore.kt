@@ -28,6 +28,8 @@ data class AudiobookState(
     val lineIndex: Int = 0,
     val mode: String = PlayMode.ALL.name,
     val speed: Float = 1f,
+    /** Moods detected by the on-device model, one per chunk ("" = pending, "-" = none). */
+    val moodLabels: List<String> = emptyList(),
 )
 
 object AudiobookStore {

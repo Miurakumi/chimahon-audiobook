@@ -23,6 +23,7 @@ media = "1.7.1"
 truetypeparser = "2.1.4"
 chimahon-ffmpeg = "v8.1.1.8"
 litert = "2.1.6"
+litertlm = "0.18.0"
 quickjs-kt = "1.0.0-alpha13"
 
 [libraries]
@@ -111,6 +112,7 @@ firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
 
 litert = { module = "com.google.ai.edge.litert:litert", version.ref = "litert" }
+litertlm = { module = "com.google.ai.edge.litertlm:litertlm-android", version.ref = "litertlm" }
 
 aboutLibraries-compose = { module = "com.mikepenz:aboutlibraries-compose-m3", version.ref = "aboutlib_version" }
 

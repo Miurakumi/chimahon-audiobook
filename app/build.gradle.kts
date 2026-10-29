@@ -379,6 +379,7 @@ dependencies {
     // MPV player
     implementation(libs.aniyomi.mpv)
     implementation(libs.seeker)
+    implementation(libs.litertlm) // on-device model for the audiobook "Auto" music mode
     implementation(libs.ffmpeg.kit)
     implementation(libs.smart.exception.java)
     implementation(libs.mediasession)

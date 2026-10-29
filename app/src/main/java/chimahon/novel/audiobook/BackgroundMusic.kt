@@ -111,8 +111,16 @@ class BackgroundMusic(
     // ---------------------------------------------------------------- playback
 
     /** Picks a mood. Picking the one that is already playing turns the music off. */
-    fun select(newMood: Mood?) {
-        val target = if (newMood == mood) null else newMood
+    fun select(newMood: Mood?) = switchTo(if (newMood == mood) null else newMood)
+
+    /** Shows (or clears) a short message under the mood buttons. */
+    fun showMessage(text: String?) {
+        message = text
+    }
+
+    /** Plays exactly [target] (null = off), without the tap-again-to-stop behavior. */
+    fun switchTo(target: Mood?) {
+        if (target == mood && (target == null || player != null || switchJob?.isActive == true)) return
         mood = target
         message = null
         switchJob?.cancel()
