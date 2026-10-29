@@ -3,9 +3,17 @@ package chimahon.novel.audiobook
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,9 +43,7 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -521,7 +527,6 @@ private fun DialLine(
 
 // ------------------------------------------------------------------ controls
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Controls(controller: AudiobookController) {
     val total = controller.lines.size
@@ -617,19 +622,13 @@ private fun Controls(controller: AudiobookController) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             Mood.entries.forEach { mood ->
-                FilterChip(
+                MoodButton(
+                    mood = mood,
                     selected = controller.music.mood == mood,
                     onClick = { controller.music.select(mood) },
-                    label = {
-                        Text(
-                            mood.label,
-                            maxLines = 1,
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -645,6 +644,70 @@ private fun Controls(controller: AudiobookController) {
                 style = MaterialTheme.typography.labelSmall,
             )
         }
+    }
+}
+
+/**
+ * One mood button. Active: soft tinted background, strong border, light text and a small
+ * dot. Inactive: discreet dark background. The change is animated.
+ */
+@Composable
+private fun MoodButton(
+    mood: Mood,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val accent = Color(mood.color)
+    val darkBase = Color(0xFF26262B)
+    val spec = tween<Color>(durationMillis = 350)
+    val background by animateColorAsState(
+        if (selected) lerp(darkBase, accent, 0.45f) else darkBase,
+        animationSpec = spec,
+        label = "moodBackground",
+    )
+    val border by animateColorAsState(
+        if (selected) accent else Color(0xFF3A3A41),
+        animationSpec = spec,
+        label = "moodBorder",
+    )
+    val textColor by animateColorAsState(
+        if (selected) Color(0xFFF7F7FA) else Color(0xFF9A9AA3),
+        animationSpec = spec,
+        label = "moodText",
+    )
+    val dotAlpha by animateFloatAsState(
+        if (selected) 1f else 0f,
+        animationSpec = tween(350),
+        label = "moodDot",
+    )
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier = modifier
+            .height(46.dp)
+            .clip(shape)
+            .background(background)
+            .border(if (selected) 2.dp else 1.dp, border, shape)
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            mood.label,
+            color = textColor,
+            maxLines = 1,
+            softWrap = false,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        )
+        Box(
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .size(6.dp)
+                .graphicsLayer { alpha = dotAlpha }
+                .clip(CircleShape)
+                .background(accent),
+        )
     }
 }
 

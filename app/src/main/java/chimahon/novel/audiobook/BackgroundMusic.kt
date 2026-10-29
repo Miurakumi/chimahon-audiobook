@@ -25,11 +25,12 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /** Scene moods the background music can follow. */
-enum class Mood(val label: String) {
-    FIGHT("Pelea"),
-    CALM("Calma"),
-    SAD("Tristeza"),
-    HOPE("Esperanza"),
+enum class Mood(val label: String, val color: Long) {
+    FIGHT("Pelea", 0xFFE5484D),
+    CALM("Día a día", 0xFF4CAF7A), // CALM keeps its name so saved folders still work
+    SAD("Tristeza", 0xFF4A7BD0),
+    HOPE("Esperanza", 0xFFE8B23A),
+    COMEDY("Comedia", 0xFFD65DB1),
 }
 
 /** Global music settings (the same for every book): one folder per mood, and the volume. */
