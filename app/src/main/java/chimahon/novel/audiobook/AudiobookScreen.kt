@@ -1,5 +1,8 @@
 package chimahon.novel.audiobook
 
+import androidx.compose.ui.platform.LocalView
+import eu.kanade.tachiyomi.R
+import androidx.compose.ui.res.stringResource
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -142,6 +145,15 @@ fun AudiobookScreen(
     val scope = rememberCoroutineScope()
     val controller = remember(bookKey) { AudiobookController(context, bookKey, scope) }
     var showMusicDialog by remember { mutableStateOf(false) }
+
+    // Keep the screen on while the book is being analyzed, so the phone does not sleep mid-way.
+    val view = LocalView.current
+    val analyzing = controller.auto.running
+    DisposableEffect(analyzing) {
+        val previous = view.keepScreenOn
+        if (analyzing) view.keepScreenOn = true
+        onDispose { view.keepScreenOn = previous }
+    }
     if (showMusicDialog) {
         MusicDialog(
             music = controller.music,
@@ -189,7 +201,7 @@ fun AudiobookScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onClose) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver al libro")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.dial_back))
             }
             Text(
                 text = title,
@@ -199,11 +211,11 @@ fun AudiobookScreen(
                 style = MaterialTheme.typography.titleMedium,
             )
             IconButton(onClick = { showMusicDialog = true }) {
-                Icon(Icons.Filled.MusicNote, contentDescription = "Música de fondo")
+                Icon(Icons.Filled.MusicNote, contentDescription = stringResource(R.string.dial_music))
             }
             if (controller.hasFiles) {
                 IconButton(onClick = { controller.changeFiles() }) {
-                    Icon(Icons.Filled.Folder, contentDescription = "Cambiar archivos")
+                    Icon(Icons.Filled.Folder, contentDescription = stringResource(R.string.dial_change_files))
                 }
             }
         }
@@ -259,9 +271,9 @@ private fun SetupPane(controller: AudiobookController, modifier: Modifier = Modi
         verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Audiolibro", style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.dial_title), style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Elegí el audio y el SRT de este libro. Se guardan y la próxima vez abre directo donde quedaste.",
+            stringResource(R.string.dial_setup_help),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -274,20 +286,20 @@ private fun SetupPane(controller: AudiobookController, modifier: Modifier = Modi
             onClick = { audioPicker.launch(arrayOf("audio/*", "application/octet-stream")) },
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(controller.state.audioName?.let { "Audio: $it" } ?: "Elegir audio")
+            Text(controller.state.audioName?.let { stringResource(R.string.dial_audio_named, it) } ?: stringResource(R.string.dial_pick_audio))
         }
         Button(
             onClick = { srtPicker.launch(arrayOf("*/*")) },
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(controller.state.srtName?.let { "SRT: $it" } ?: "Elegir SRT")
+            Text(controller.state.srtName?.let { stringResource(R.string.dial_srt_named, it) } ?: stringResource(R.string.dial_pick_srt))
         }
 
         if (controller.hasFiles && controller.error != null) {
             OutlinedButton(
                 onClick = { controller.retry() },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Reintentar") }
+            ) { Text(stringResource(R.string.dial_retry)) }
         }
     }
 }
@@ -568,7 +580,7 @@ private fun Controls(controller: AudiobookController, onOpenMusicSettings: () ->
                 .padding(horizontal = 6.dp),
         )
         Text(
-            text = "${active + 1} / $total" + if (controller.workMode) " · modo trabajo" else "",
+            text = "${active + 1} / $total" + if (controller.workMode) stringResource(R.string.dial_work_mode_suffix) else "",
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 4.dp),
@@ -589,7 +601,7 @@ private fun Controls(controller: AudiobookController, onOpenMusicSettings: () ->
                 ) {
                     Icon(
                         Icons.Filled.Menu,
-                        contentDescription = "Menú",
+                        contentDescription = stringResource(R.string.dial_menu),
                         modifier = Modifier.size(30.dp),
                     )
                 }
@@ -597,28 +609,33 @@ private fun Controls(controller: AudiobookController, onOpenMusicSettings: () ->
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
                 ) {
-                    MenuLabel("Reproducción")
+                    MenuLabel(stringResource(R.string.dial_menu_playback))
                     // These two cycle through their values and keep the menu open.
                     DropdownMenuItem(
                         text = {
                             Text(
-                                "Modo: " + when (controller.mode) {
-                                    PlayMode.ALL -> "Todas"
-                                    PlayMode.QUOTES -> "Citas"
-                                    PlayMode.MANUAL -> "Manual"
-                                },
+                                stringResource(
+                                    R.string.dial_mode_label,
+                                    stringResource(
+                                        when (controller.mode) {
+                                            PlayMode.ALL -> R.string.dial_mode_all
+                                            PlayMode.QUOTES -> R.string.dial_mode_quotes
+                                            PlayMode.MANUAL -> R.string.dial_mode_manual
+                                        },
+                                    ),
+                                ),
                             )
                         },
                         onClick = { controller.cycleMode() },
                     )
                     DropdownMenuItem(
-                        text = { Text("Velocidad: ${controller.state.speed}x") },
+                        text = { Text(stringResource(R.string.dial_speed, controller.state.speed.toString())) },
                         onClick = { controller.cycleSpeed() },
                     )
                     HorizontalDivider()
-                    MenuLabel("Música de fondo")
+                    MenuLabel(stringResource(R.string.dial_music))
                     MoodMenuItem(
-                        label = if (controller.autoMusic) "Auto · activado" else "Auto",
+                        label = stringResource(if (controller.autoMusic) R.string.dial_auto_on else R.string.dial_auto),
                         accent = Color(0xFF7C6CF0),
                         selected = controller.autoMusic,
                         onClick = {
@@ -628,7 +645,7 @@ private fun Controls(controller: AudiobookController, onOpenMusicSettings: () ->
                     )
                     Mood.entries.forEach { mood ->
                         MoodMenuItem(
-                            label = mood.label,
+                            label = stringResource(mood.labelRes),
                             accent = Color(mood.color),
                             selected = controller.music.mood == mood,
                             onClick = {
@@ -639,7 +656,7 @@ private fun Controls(controller: AudiobookController, onOpenMusicSettings: () ->
                     }
                     HorizontalDivider()
                     DropdownMenuItem(
-                        text = { Text("Ajustes de música…") },
+                        text = { Text(stringResource(R.string.dial_music_settings)) },
                         leadingIcon = { Icon(Icons.Filled.MusicNote, contentDescription = null) },
                         onClick = {
                             menuOpen = false
@@ -656,7 +673,7 @@ private fun Controls(controller: AudiobookController, onOpenMusicSettings: () ->
                 ) {
                     Icon(
                         Icons.Filled.SkipPrevious,
-                        contentDescription = "Línea anterior",
+                        contentDescription = stringResource(R.string.dial_prev),
                         modifier = Modifier.size(34.dp),
                     )
                 }
@@ -672,7 +689,7 @@ private fun Controls(controller: AudiobookController, onOpenMusicSettings: () ->
                 ) {
                     Icon(
                         Icons.Filled.SkipNext,
-                        contentDescription = "Línea siguiente",
+                        contentDescription = stringResource(R.string.dial_next),
                         modifier = Modifier.size(34.dp),
                     )
                 }
@@ -756,7 +773,7 @@ private fun PlayButton(
             Icon(
                 modifier = Modifier.size(42.dp),
                 imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                contentDescription = if (playing) "Pausar" else "Reproducir línea",
+                contentDescription = stringResource(if (playing) R.string.dial_pause else R.string.dial_play_line),
                 tint = content,
             )
         }
@@ -838,14 +855,14 @@ private fun MusicDialog(
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Música de fondo") },
+        title = { Text(stringResource(R.string.dial_music)) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    "Elegí una carpeta con tu música para cada clima. Suena una pista al azar de la carpeta.",
+                    stringResource(R.string.dial_music_help),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Mood.entries.forEach { mood ->
@@ -853,7 +870,7 @@ private fun MusicDialog(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(mood.label, modifier = Modifier.weight(0.4f))
+                        Text(stringResource(mood.labelRes), modifier = Modifier.weight(0.4f))
                         TextButton(
                             onClick = {
                                 pending = mood
@@ -862,14 +879,14 @@ private fun MusicDialog(
                             modifier = Modifier.weight(0.6f),
                         ) {
                             Text(
-                                music.folderName(mood) ?: "Elegir carpeta",
+                                music.folderName(mood) ?: stringResource(R.string.dial_pick_folder),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
                 }
-                Text("Volumen", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.dial_volume), style = MaterialTheme.typography.labelMedium)
                 Slider(
                     value = music.config.volume,
                     onValueChange = { music.setVolume(it) },
@@ -877,9 +894,9 @@ private fun MusicDialog(
                 )
 
                 // ---- Auto (experimental): a small on-device model reads the SRT.
-                Text("Auto (experimental)", style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(R.string.dial_auto_title), style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "Un modelo chico (Qwen3 0.6B, unos 330 MB) corre en el celu y lee el SRT para detectar el clima de cada parte.",
+                    stringResource(R.string.dial_auto_help),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 val progress = auto.downloadProgress
@@ -890,67 +907,69 @@ private fun MusicDialog(
                                 progress = { progress },
                                 modifier = Modifier.fillMaxWidth(),
                             )
-                            Text("Copiando/bajando el modelo… ${(progress * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(R.string.dial_model_progress_pct, (progress * 100).toInt()), style = MaterialTheme.typography.bodySmall)
                         } else {
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                            Text("Copiando/bajando el modelo…", style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(R.string.dial_model_progress), style = MaterialTheme.typography.bodySmall)
                         }
                     }
                     !auto.modelReady -> {
                         Button(onClick = { auto.downloadModel() }, modifier = Modifier.fillMaxWidth()) {
-                            Text("Bajar el modelo")
+                            Text(stringResource(R.string.dial_download_model))
                         }
                         TextButton(
                             onClick = { modelPicker.launch(arrayOf("*/*")) },
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Elegir archivo del modelo") }
+                        ) { Text(stringResource(R.string.dial_pick_model)) }
                     }
-                    else -> Text("Modelo listo.", style = MaterialTheme.typography.bodySmall)
+                    else -> Text(stringResource(R.string.dial_model_ready), style = MaterialTheme.typography.bodySmall)
                 }
                 if (auto.modelReady) {
                     Text(
-                        "Analizadas ${auto.analyzedCount} de ${auto.chunks.size} tandas" +
-                            (auto.secondsPerChunk?.let { " · ${"%.1f".format(it)} s por tanda" } ?: ""),
+                        stringResource(R.string.dial_analyzed, auto.analyzedCount, auto.chunks.size) +
+                            (auto.secondsPerChunk?.let {
+                                stringResource(R.string.dial_seconds_per_batch, "%.1f".format(it))
+                            } ?: ""),
                         style = MaterialTheme.typography.bodySmall,
                     )
                     if (auto.running) {
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                         OutlinedButton(onClick = { auto.cancel() }, modifier = Modifier.fillMaxWidth()) {
-                            Text("Parar análisis")
+                            Text(stringResource(R.string.dial_stop_analysis))
                         }
                     } else {
                         Button(
                             onClick = { auto.analyze(AUTO_BATCH) },
                             enabled = auto.chunks.isNotEmpty(),
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Analizar $AUTO_BATCH tandas") }
+                        ) { Text(stringResource(R.string.dial_analyze_batch, AUTO_BATCH)) }
                         OutlinedButton(
                             onClick = { auto.analyze(null) },
                             enabled = auto.chunks.isNotEmpty(),
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Analizar todo el libro") }
+                        ) { Text(stringResource(R.string.dial_analyze_all)) }
                         if (auto.analyzedCount > 0) {
                             TextButton(
                                 onClick = onClearAnalysis,
                                 modifier = Modifier.fillMaxWidth(),
-                            ) { Text("Borrar análisis y empezar de nuevo") }
+                            ) { Text(stringResource(R.string.dial_clear_analysis)) }
                         }
                     }
                     if (auto.chunks.isEmpty()) {
-                        Text("Cargá primero el audio y el SRT del libro.", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.dial_load_files_first), style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 auto.status?.let {
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
                 if (auto.analyzedCount > 0) {
-                    Text("Lo que detectó:", style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(R.string.dial_detected), style = MaterialTheme.typography.labelMedium)
                     LazyColumn(modifier = Modifier.height(160.dp)) {
                         items(auto.chunks.indices.filter { auto.labels[it].isNotEmpty() }) { i ->
                             val chunk = auto.chunks[i]
                             val mood = auto.labelOf(i)
                             Text(
-                                "${chunk.start + 1}–${chunk.end + 1} · ${mood?.label ?: "sin clima"} · " +
+                                "${chunk.start + 1}–${chunk.end + 1} · ${mood?.let { stringResource(it.labelRes) } ?: stringResource(R.string.dial_no_mood)} · " +
                                     chunk.text.replace('\n', ' ').take(24),
                                 style = MaterialTheme.typography.bodySmall,
                                 maxLines = 1,
@@ -962,6 +981,6 @@ private fun MusicDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Listo") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.dial_done)) } },
     )
 }

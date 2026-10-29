@@ -1,5 +1,6 @@
 package chimahon.novel.audiobook
 
+import eu.kanade.tachiyomi.R
 import android.content.Context
 import android.content.Intent
 import chimahon.anki.AnkiSentenceAudioFailure
@@ -169,7 +170,7 @@ class AudiobookController(
             try {
                 val parsed = withContext(Dispatchers.IO) { SrtParser.parse(readText(srt)) }
                 if (parsed.isEmpty()) {
-                    error = "El SRT no tiene líneas válidas."
+                    error = context.getString(R.string.dial_err_srt_empty)
                     return@launch
                 }
                 releasePlayer()
@@ -179,7 +180,7 @@ class AudiobookController(
                     pollJob?.cancel()
                 }
                 mp.setOnErrorListener { _, what, extra ->
-                    error = "Error de audio ($what/$extra)"
+                    error = context.getString(R.string.dial_err_audio, what, extra)
                     isPlaying = false
                     pollJob?.cancel()
                     true
@@ -191,7 +192,7 @@ class AudiobookController(
                 activeIndex = activeIndex.coerceIn(0, parsed.lastIndex)
                 ready = true
             } catch (e: Exception) {
-                error = "No se pudo abrir el audio o el SRT. Elegilos de nuevo. (${e.message ?: e.javaClass.simpleName})"
+                error = context.getString(R.string.dial_err_open, e.message ?: e.javaClass.simpleName)
             } finally {
                 loading = false
             }
@@ -200,7 +201,7 @@ class AudiobookController(
 
     private fun readText(uri: Uri): String {
         val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            ?: throw IllegalStateException("No se pudo leer el SRT")
+            ?: throw IllegalStateException(context.getString(R.string.dial_err_read_srt))
         return when {
             bytes.size >= 2 && bytes[0] == 0xFF.toByte() && bytes[1] == 0xFE.toByte() ->
                 String(bytes, 2, bytes.size - 2, Charsets.UTF_16LE)
@@ -290,7 +291,7 @@ class AudiobookController(
         }.onFailure {
             isPlaying = false
             debug = "no arrancó: ${it.message ?: it.javaClass.simpleName}"
-            error = "No se pudo reproducir (${it.message ?: it.javaClass.simpleName})"
+            error = context.getString(R.string.dial_err_play, it.message ?: it.javaClass.simpleName)
         }
     }
 
@@ -395,7 +396,7 @@ class AudiobookController(
             return
         }
         if (!auto.hasResults) {
-            music.showMessage("Auto necesita el análisis del libro (ícono de música, arriba).")
+            music.showMessage(context.getString(R.string.dial_auto_needs))
             return
         }
         music.showMessage(null)

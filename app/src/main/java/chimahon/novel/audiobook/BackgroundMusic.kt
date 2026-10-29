@@ -1,5 +1,7 @@
 package chimahon.novel.audiobook
 
+import eu.kanade.tachiyomi.R
+import androidx.annotation.StringRes
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
@@ -25,13 +27,13 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /** Scene moods the background music can follow. */
-enum class Mood(val label: String, val color: Long) {
-    FIGHT("Pelea", 0xFFE5484D),
-    TENSION("Tensión", 0xFFE0823D), // in between: tense scene, no fight yet
-    CALM("Día a día", 0xFF4CAF7A), // CALM keeps its name so saved folders still work
-    SAD("Tristeza", 0xFF4A7BD0),
-    HOPE("Esperanza", 0xFFE8B23A),
-    COMEDY("Comedia", 0xFFD65DB1),
+enum class Mood(@StringRes val labelRes: Int, val color: Long) {
+    FIGHT(R.string.dial_mood_fight, 0xFFE5484D),
+    TENSION(R.string.dial_mood_tension, 0xFFE0823D), // in between: tense scene, no fight yet
+    CALM(R.string.dial_mood_calm, 0xFF4CAF7A), // CALM keeps its name so saved folders still work
+    SAD(R.string.dial_mood_sad, 0xFF4A7BD0),
+    HOPE(R.string.dial_mood_hope, 0xFFE8B23A),
+    COMEDY(R.string.dial_mood_comedy, 0xFFD65DB1),
 }
 
 /** Global music settings (the same for every book): one folder per mood, and the volume. */
@@ -140,12 +142,12 @@ class BackgroundMusic(
     private suspend fun startMood(target: Mood) {
         val folder = config.folders[target.name]?.let(Uri::parse)
         if (folder == null) {
-            fail("Elegí la carpeta de ${target.label} (ícono de música, arriba).")
+            fail(context.getString(R.string.dial_music_pick_folder, context.getString(target.labelRes)))
             return
         }
         val tracks = withContext(Dispatchers.IO) { listAudio(folder) }
         if (tracks.isEmpty()) {
-            fail("No encontré audios en la carpeta de ${target.label}.")
+            fail(context.getString(R.string.dial_music_empty, context.getString(target.labelRes)))
             return
         }
         val pick = tracks.filter { it != lastTrack[target] }.ifEmpty { tracks }.random()
@@ -153,7 +155,13 @@ class BackgroundMusic(
         val mp = try {
             createPlayer(pick)
         } catch (e: Exception) {
-            fail("No se pudo abrir la música de ${target.label}. (${e.message ?: e.javaClass.simpleName})")
+            fail(
+                context.getString(
+                    R.string.dial_music_open_failed,
+                    context.getString(target.labelRes),
+                    e.message ?: e.javaClass.simpleName,
+                ),
+            )
             return
         }
         mp.setVolume(0f, 0f)

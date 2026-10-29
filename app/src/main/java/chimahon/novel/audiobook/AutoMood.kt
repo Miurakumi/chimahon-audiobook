@@ -1,5 +1,6 @@
 package chimahon.novel.audiobook
 
+import eu.kanade.tachiyomi.R
 import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.getValue
@@ -72,7 +73,7 @@ object MoodModel {
                 }
             }
             target.delete()
-            if (!part.renameTo(target)) throw IllegalStateException("No se pudo guardar el modelo")
+            if (!part.renameTo(target)) throw IllegalStateException(context.getString(R.string.dial_err_save_model))
             onProgress(1f)
         } finally {
             connection.disconnect()
@@ -85,7 +86,7 @@ object MoodModel {
         val target = file(context)
         context.contentResolver.openInputStream(uri)?.use { input ->
             target.outputStream().use { input.copyTo(it) }
-        } ?: throw IllegalStateException("No se pudo leer el archivo")
+        } ?: throw IllegalStateException(context.getString(R.string.dial_err_read_file))
     }
 }
 
@@ -173,15 +174,15 @@ class AutoMood(
             try {
                 MoodModel.download(context) { downloadProgress = it }
                 modelReady = MoodModel.isReady(context)
-                if (!modelReady) status = "El modelo se bajó incompleto. Probá de nuevo."
+                if (!modelReady) status = context.getString(R.string.dial_model_incomplete)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
                 val reason = e.message ?: e.javaClass.simpleName
                 status = if (reason.startsWith("HTTP 401") || reason.startsWith("HTTP 403")) {
-                    "Hugging Face pidió login (${reason}). Bajá el archivo a mano y elegilo con \"Elegir archivo del modelo\"."
+                    context.getString(R.string.dial_hf_login, reason)
                 } else {
-                    "No se pudo bajar el modelo ($reason)."
+                    context.getString(R.string.dial_model_download_failed, reason)
                 }
             } finally {
                 downloadProgress = null
@@ -196,11 +197,11 @@ class AutoMood(
             try {
                 MoodModel.importFrom(context, uri)
                 modelReady = MoodModel.isReady(context)
-                if (!modelReady) status = "El archivo elegido no parece ser el modelo."
+                if (!modelReady) status = context.getString(R.string.dial_model_not_valid)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                status = "No se pudo copiar el modelo (${e.message ?: e.javaClass.simpleName})."
+                status = context.getString(R.string.dial_model_copy_failed, e.message ?: e.javaClass.simpleName)
             } finally {
                 downloadProgress = null
             }
@@ -213,12 +214,12 @@ class AutoMood(
     fun analyze(count: Int?) {
         if (running || chunks.isEmpty()) return
         if (!MoodModel.isReady(context)) {
-            status = "Primero bajá el modelo."
+            status = context.getString(R.string.dial_download_first)
             return
         }
         val pending = chunks.indices.filter { labels[it].isEmpty() }.let { if (count != null) it.take(count) else it }
         if (pending.isEmpty()) {
-            status = "Ya está todo analizado."
+            status = context.getString(R.string.dial_all_analyzed)
             return
         }
         status = null
@@ -261,7 +262,7 @@ class AutoMood(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                status = "El análisis falló: ${e.message ?: e.javaClass.simpleName}"
+                status = context.getString(R.string.dial_analysis_failed, e.message ?: e.javaClass.simpleName)
             } finally {
                 running = false
                 save()
