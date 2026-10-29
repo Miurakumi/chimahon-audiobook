@@ -29,7 +29,7 @@ Inside the EPUB reader there is a headphones button that opens the audiobook dia
 
 ## Download
 
-Builds are not published yet. To try it, clone this repository and run it from Android Studio.
+Builds are in the 1.0.
 
 *Requires Android 8.0 or higher.*
 
