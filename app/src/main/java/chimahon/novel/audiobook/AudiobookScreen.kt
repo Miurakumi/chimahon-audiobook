@@ -8,18 +8,16 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,7 +35,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -45,6 +45,9 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Slider
@@ -221,7 +224,10 @@ fun AudiobookScreen(
                     onDismissPopup = onDismissPopup,
                     modifier = Modifier.weight(1f),
                 )
-                Controls(controller = controller)
+                Controls(
+                    controller = controller,
+                    onOpenMusicSettings = { showMusicDialog = true },
+                )
             }
         }
     }
@@ -538,9 +544,10 @@ private fun DialLine(
 // ------------------------------------------------------------------ controls
 
 @Composable
-private fun Controls(controller: AudiobookController) {
+private fun Controls(controller: AudiobookController, onOpenMusicSettings: () -> Unit) {
     val total = controller.lines.size
     val active = controller.activeIndex
+    var menuOpen by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -567,19 +574,72 @@ private fun Controls(controller: AudiobookController) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(
-                onClick = { controller.cycleMode() },
-                modifier = Modifier.height(56.dp),
-                contentPadding = PaddingValues(horizontal = 6.dp),
-            ) {
-                Text(
-                    when (controller.mode) {
-                        PlayMode.ALL -> "Todas"
-                        PlayMode.QUOTES -> "Citas"
-                        PlayMode.MANUAL -> "Manual"
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                )
+            // Menu: playback options and background music, instead of loose buttons.
+            Box {
+                IconButton(
+                    onClick = { menuOpen = true },
+                    modifier = Modifier.size(56.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.Menu,
+                        contentDescription = "Menú",
+                        modifier = Modifier.size(30.dp),
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuOpen,
+                    onDismissRequest = { menuOpen = false },
+                ) {
+                    MenuLabel("Reproducción")
+                    // These two cycle through their values and keep the menu open.
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                "Modo: " + when (controller.mode) {
+                                    PlayMode.ALL -> "Todas"
+                                    PlayMode.QUOTES -> "Citas"
+                                    PlayMode.MANUAL -> "Manual"
+                                },
+                            )
+                        },
+                        onClick = { controller.cycleMode() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Velocidad: ${controller.state.speed}x") },
+                        onClick = { controller.cycleSpeed() },
+                    )
+                    HorizontalDivider()
+                    MenuLabel("Música de fondo")
+                    MoodMenuItem(
+                        label = if (controller.autoMusic) "Auto · activado" else "Auto",
+                        accent = Color(0xFF7C6CF0),
+                        selected = controller.autoMusic,
+                        onClick = {
+                            controller.toggleAuto()
+                            menuOpen = false
+                        },
+                    )
+                    Mood.entries.forEach { mood ->
+                        MoodMenuItem(
+                            label = mood.label,
+                            accent = Color(mood.color),
+                            selected = controller.music.mood == mood,
+                            onClick = {
+                                controller.pickMood(mood)
+                                menuOpen = false
+                            },
+                        )
+                    }
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("Ajustes de música…") },
+                        leadingIcon = { Icon(Icons.Filled.MusicNote, contentDescription = null) },
+                        onClick = {
+                            menuOpen = false
+                            onOpenMusicSettings()
+                        },
+                    )
+                }
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -615,42 +675,10 @@ private fun Controls(controller: AudiobookController) {
                 }
             }
 
-            TextButton(
-                onClick = { controller.cycleSpeed() },
-                modifier = Modifier.height(56.dp),
-                contentPadding = PaddingValues(horizontal = 6.dp),
-            ) {
-                Text(
-                    "${controller.state.speed}x",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
+            // Keeps the play controls centered (same width as the menu button).
+            Spacer(modifier = Modifier.size(56.dp))
         }
 
-        // Immersion mode: "Auto" follows the detected mood; a mood button picks one by hand
-        // (tap it again to turn the music off).
-        AutoButton(
-            selected = controller.autoMusic,
-            onClick = { controller.toggleAuto() },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp),
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            Mood.entries.forEach { mood ->
-                MoodButton(
-                    mood = mood,
-                    selected = controller.music.mood == mood,
-                    onClick = { controller.pickMood(mood) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
         controller.music.message?.let {
             Text(
                 it,
@@ -665,108 +693,52 @@ private fun Controls(controller: AudiobookController) {
     }
 }
 
-/**
- * One mood button. Active: soft tinted background, strong border, light text and a small
- * dot. Inactive: discreet dark background. The change is animated.
- */
 @Composable
-private fun MoodButton(
-    mood: Mood,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val accent = Color(mood.color)
-    val darkBase = Color(0xFF26262B)
-    val spec = tween<Color>(durationMillis = 350)
-    val background by animateColorAsState(
-        if (selected) lerp(darkBase, accent, 0.45f) else darkBase,
-        animationSpec = spec,
-        label = "moodBackground",
+private fun MenuLabel(text: String) {
+    Text(
+        text,
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.labelSmall,
     )
-    val border by animateColorAsState(
-        if (selected) accent else Color(0xFF3A3A41),
-        animationSpec = spec,
-        label = "moodBorder",
-    )
-    val textColor by animateColorAsState(
-        if (selected) Color(0xFFF7F7FA) else Color(0xFF9A9AA3),
-        animationSpec = spec,
-        label = "moodText",
-    )
-    val dotAlpha by animateFloatAsState(
-        if (selected) 1f else 0f,
-        animationSpec = tween(350),
-        label = "moodDot",
-    )
-    val shape = RoundedCornerShape(12.dp)
-    Column(
-        modifier = modifier
-            .height(46.dp)
-            .clip(shape)
-            .background(background)
-            .border(if (selected) 2.dp else 1.dp, border, shape)
-            .clickable(onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            mood.label,
-            color = textColor,
-            maxLines = 1,
-            softWrap = false,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        )
-        Box(
-            modifier = Modifier
-                .padding(top = 4.dp)
-                .size(6.dp)
-                .graphicsLayer { alpha = dotAlpha }
-                .clip(CircleShape)
-                .background(accent),
-        )
-    }
 }
 
-/** The "Auto" toggle: same look as a mood button, with its own accent color. */
+/**
+ * A mood (or Auto) entry of the menu. Selected: soft tinted background, bold text, bright dot
+ * and a check mark. The background change is animated.
+ */
 @Composable
-private fun AutoButton(selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val accent = Color(0xFF7C6CF0)
-    val darkBase = Color(0xFF26262B)
-    val spec = tween<Color>(durationMillis = 350)
+private fun MoodMenuItem(
+    label: String,
+    accent: Color,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
     val background by animateColorAsState(
-        if (selected) lerp(darkBase, accent, 0.45f) else darkBase,
-        animationSpec = spec,
-        label = "autoBackground",
+        if (selected) accent.copy(alpha = 0.22f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 350),
+        label = "moodMenuBackground",
     )
-    val border by animateColorAsState(
-        if (selected) accent else Color(0xFF3A3A41),
-        animationSpec = spec,
-        label = "autoBorder",
+    DropdownMenuItem(
+        text = {
+            Text(label, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+        },
+        onClick = onClick,
+        modifier = Modifier.background(background),
+        leadingIcon = {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(accent.copy(alpha = if (selected) 1f else 0.35f)),
+            )
+        },
+        trailingIcon = if (selected) {
+            { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+        } else {
+            null
+        },
     )
-    val textColor by animateColorAsState(
-        if (selected) Color(0xFFF7F7FA) else Color(0xFF9A9AA3),
-        animationSpec = spec,
-        label = "autoText",
-    )
-    val shape = RoundedCornerShape(12.dp)
-    Box(
-        modifier = modifier
-            .height(36.dp)
-            .clip(shape)
-            .background(background)
-            .border(if (selected) 2.dp else 1.dp, border, shape)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            if (selected) "Auto · activado" else "Auto",
-            color = textColor,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        )
-    }
 }
 
 // ------------------------------------------------------------------ music settings
