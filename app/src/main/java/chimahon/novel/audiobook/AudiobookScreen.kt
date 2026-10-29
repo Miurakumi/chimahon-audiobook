@@ -525,16 +525,6 @@ private fun Controls(controller: AudiobookController) {
                 .fillMaxWidth()
                 .padding(horizontal = 6.dp),
         )
-        if (controller.debug.isNotBlank()) {
-            Text(
-                text = controller.debug,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
         Text(
             text = "${active + 1} / $total",
             modifier = Modifier
