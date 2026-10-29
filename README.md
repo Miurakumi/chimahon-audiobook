@@ -1,110 +1,46 @@
 <div align="center">
 
 <img width="200" height="200" src="./app/src/main/res/drawable/chimahon.png" alt="Chimahon icon" />
-<h1 align="center">Chimahon</h1>
+<h1 align="center">Chimahon Dial</h1>
 
-**Mihon-focused immersion fork with Manga, Novel, and Anime support.**
+**A fork of [Chimahon](https://github.com/sohilsayed/chimahon) that keeps everything the original has, plus an audiobook player in my own style.**
 
-[![GitHub downloads](https://img.shields.io/github/downloads/sohilsayed/chimahon/latest/total?label=Latest%20Downloads&labelColor=27303D&color=0D1111&logo=github&logoColor=FFFFFF&style=flat)](https://github.com/sohilsayed/chimahon/releases/latest)
-[![GitHub downloads](https://img.shields.io/github/downloads/sohilsayed/chimahon/total?label=Total%20Downloads&labelColor=27303D&color=0D1111&logo=github&logoColor=FFFFFF&style=flat)](https://github.com/sohilsayed/chimahon/releases)
-[![Discord](https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white&label=)](https://discord.gg/Ak2sW9Nvr9)
+</div>
 
 ---
 
-Chimahon is a specialized Android reader designed for language learners and immersion enthusiasts. It extends the powerful core of **Mihon/Komikku** with integrated tools for dictionary lookup, OCR-assisted text capture, and seamless flashcard creation for vocabulary mining.
+## What this is
 
-## 🖼️ Screenshots
+Chimahon Dial is a personal fork of Chimahon, the Android immersion reader for manga, novels and anime (built on Mihon/Komikku). Everything in the original is still here and works the same way. The only difference is the audiobook player described below.
 
-<p align="center">
-  <img src="./.github/readme-images/novel.png" width="32%" />
-  <img src="./.github/readme-images/popup-manga.png" width="32%" />
-  <img src="./.github/readme-images/dict-tab.png" width="32%" />
-  <img src="./.github/readme-images/anime.jpg" width="64%" />
-</p>
+For the full list of features of the original app, see the [original Chimahon README](https://github.com/sohilsayed/chimahon#readme).
 
-## 🚀 Key Immersion Features
+## What I added: the audiobook dial
 
-### 📖 Novel & Manga Support
-- **Novel Reader**: E-book reader with inline dictionary lookup and an illustration viewer for art OCR and vocabulary mining.
-- **Manga Reader**: Native reading experience with support for all major online and local sources.
-- **Panel-by-Panel Navigation**: AI-driven comic panel detection and smart panel-by-panel reading navigation powered by LiteRT.
-- **Local OCR**: High-performance, on-device text recognition — no internet connection required.
-- **.mokuro Support**: Native integration for reading `.mokuro` formatted manga files with pre-rendered OCR overlays.
+Inside the EPUB reader there is a headphones button that opens the audiobook dial.
 
-### 🔍 Native Dictionary Lookup
-- **Dictionary Tab**: Import and manage multiple dictionary files directly in-app.
-- **Multi-Language Support**: Full support for Japanese, Chinese, Korean, and more.
-- **Recursive Lookups**: Effortlessly search within definitions to clarify complex terms.
-- **Slick Dictionary Popup**: A modern, customizable lookup interface with support for custom fonts, themes, and recursive searches.
-- **E-Ink Optimized**: High-contrast mode designed specifically for e-paper devices.
-- **Pitch Accent**: Native support for visualizing Japanese pitch accent patterns.
+- **Audio + SRT**: pick an audio file and its subtitles (SRT). The lines show in a strip; you move the dial and the audio follows the active line.
+- **Tap to listen or look up**: tap a line to jump to it and play it, or tap a word of the active line to open the dictionary.
+- **Play modes**: all lines, quotes only (lines that start with 「), or manual. Speed from 0.75x to 1.5x.
+- **Remembers your place**: last line, mode and speed are saved for each book.
+- **Your reader settings**: text size, line spacing, character spacing and font are taken from the reader.
+- **Anki**: `{sentence-audio}` gets the audio clip of the active line, and `{cover}` adds the book cover.
+- **Immersion mode**: background music by scene mood (Fight, Day to day, Sadness, Hope, Comedy). You choose one folder of your own music for each mood.
 
-### 🎴 Anki Integration
-- **Direct Mining**: Create Anki cards instantly from lookup results while reading.
-- **Screenshot Crop**: Manually crop images for your cards with specialized UI.
-- **Smart Markers**: Flexible field mapping for expression, reading, glossary, pitch, and context sentences.
-- **Duplicate Checking**: Reliable duplicate detection to prevent redundant flashcards.
+## Download
 
-### 🌐 Screen OCR Lookup
-- **Any App**: Look up and mine text from any app — capture your screen, tap any word, and get an instant dictionary definition.
-
-### 🎬 Anime & Video Player
-- **Video Player**: Full MPV player with subtitle lookup and frame-accurate OCR for vocabulary mining.
-- **Jimaku Support**: Seamless integration for searching, fetching, and syncing Japanese subtitles.
-- **Video Frame OCR**: Look up any on-screen text, signs, or hardsubs directly from the video, even if it's not present in the subtitle file.
-- **Built-in YouTube Extension**: Stream and mine content directly from YouTube inside the app.
-- **Anime Library**: Browse, track, and organize your anime with source extensions and external tracker sync.
-
----
-
-## 🛠️ Core Features (Inherited from Upstream)
-
-Chimahon retains all the features of **Komikku** and **Mihon**:
-
-<p align="center">
-  <img src="./.github/readme-images/screens.png" alt="komikku Screenshots" width="100%"/>
-</p>
-
-- **Massive Source Support**: Access thousands of manga via community-made extensions.
-- **Suggestions**: Discover related titles directly within the app.
-- **Auto-Theme**: UI colors that adapt to the cover art of what you're reading.
-- **Cloud Sync**: 2-way progress tracking with MyAnimeList, AniList, Kitsu, and more.
-- **Privacy & Backups**: Hidden categories and secure backups (Local or Cloud).
-- **Customization**: Extensive theme options, color palettes, and reader settings.
-
----
-
-## 📥 Download
-
-[![Stable Release](https://img.shields.io/github/v/release/sohilsayed/chimahon.svg?maxAge=3600&label=Download%20Stable&labelColor=06599d&color=043b69)](https://github.com/sohilsayed/chimahon/releases/latest)
+Builds are not published yet. To try it, clone this repository and run it from Android Studio.
 
 *Requires Android 8.0 or higher.*
 
----
+## Credits
 
-## 🤝 Contributing & Support
+This project is built on the work of the original Chimahon, Mihon and Komikku teams. Thanks to everyone who made them.
 
-- **Bugs/Requests**: Please check the [Changelog](./CHANGELOG.md) and open an [Issue](https://github.com/sohilsayed/chimahon/issues).
-- **Discord**: Join our community for help and discussion: [Join Discord](https://discord.gg/Ak2sW9Nvr9)
-- **Contributing**: Pull requests are welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
+- [Chimahon](https://github.com/sohilsayed/chimahon) (original project)
+- [Mihon](https://github.com/mihonapp/mihon) and [Komikku](https://github.com/komikku-app/komikku)
+- [Yomitan](https://github.com/yomidevs/yomitan), [owocr](https://github.com/AuroraWright/owocr), [hoshidicts](https://github.com/Manhhao/hoshidicts/) and [manga-panel-detector-yolo26n](https://huggingface.co/leoxs22/manga-panel-detector-yolo26n), used by the original app
 
-### Credits & Acknowledgments
+## License
 
-- [Yomitan](https://github.com/yomidevs/yomitan): Inspiration for language-processing workflows.
-- [owocr](https://github.com/AuroraWright/owocr): Base for OCR merge and reconstruction logic.
-- [hoshidicts](https://github.com/Manhhao/hoshidicts/): Native dictionary engine powering our lookups.
-- [manga-panel-detector-yolo26n](https://huggingface.co/leoxs22/manga-panel-detector-yolo26n) by [@leoxs22](https://huggingface.co/leoxs22): YOLO model powering panel-by-panel navigation and speech bubble detection.
-- [Machita Chima (町田ちま)](https://www.youtube.com/channel/UCo7TRj3cS-f_1D9ZDmuTsjw): App name inspiration.
-
-### License
-
-This project is licensed under the **GNU General Public License v3.0**. See [LICENSE](./LICENSE) for details.
-
----
-
-<div align="center">
-  <p>Made with ❤️ for the immersion community.</p>
-  <a href="https://github.com/sohilsayed/chimahon/graphs/contributors">
-    <img src="https://contrib.rocks/image?repo=sohilsayed/chimahon" alt="Chimahon contributors" width="600"/>
-  </a>
-</div>
+Licensed under the **GNU General Public License v3.0**, the same as the original. See [LICENSE](./LICENSE).
