@@ -78,6 +78,10 @@ class AudiobookController(
         persist()
     }
 
+    /** Work mode: after each line the dial slides to the next one and plays it by itself. */
+    var workMode by mutableStateOf(false)
+        private set
+
     /** True while the music follows the detected mood of the active line. */
     var autoMusic by mutableStateOf(false)
         private set
@@ -132,6 +136,7 @@ class AudiobookController(
         lines = emptyList()
         auto.cancel()
         autoMusic = false
+        workMode = false
         state = state.copy(audioUri = null, srtUri = null, audioName = null, srtName = null)
         persist()
     }
@@ -297,6 +302,7 @@ class AudiobookController(
                     val position = runCatching { mp.currentPosition }.getOrDefault(Int.MAX_VALUE)
                     if (position >= currentEndMs) {
                         pause("fin de la línea (pos $position ms)")
+                        if (workMode) scope.launch { advanceWorkMode() }
                         break
                     }
                 }
@@ -328,7 +334,32 @@ class AudiobookController(
 
     /** Play/pause button: replays the active line from its start. */
     fun togglePlay() {
-        if (isPlaying) pause() else playLine(activeIndex)
+        if (isPlaying) {
+            workMode = false
+            pause()
+        } else {
+            playLine(activeIndex)
+        }
+    }
+
+    /** Long press on play: turns work mode on or off. */
+    fun toggleWorkMode() {
+        workMode = !workMode
+        if (workMode && !isPlaying && ready) playLine(activeIndex)
+    }
+
+    /** Work mode: slide to the next line and play it (stops at the end of the book). */
+    private fun advanceWorkMode() {
+        if (!workMode) return
+        val next = activeIndex + 1
+        if (next !in lines.indices) {
+            workMode = false
+            return
+        }
+        activeIndex = next
+        persist()
+        applyAutoMood(next)
+        playLine(next)
     }
 
     // ---------------------------------------------------------------- dial events
@@ -469,6 +500,7 @@ class AudiobookController(
 
     /** Call when the dial is closed. Saves position and frees the player. */
     fun release() {
+        workMode = false
         pause()
         persist()
         releasePlayer()

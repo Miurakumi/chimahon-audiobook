@@ -6,12 +6,16 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -49,7 +53,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -76,7 +79,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.platform.LocalDensity
@@ -91,6 +96,7 @@ import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 
 /** How many chunks the "Analizar" button reads each time. */
@@ -561,7 +567,7 @@ private fun Controls(controller: AudiobookController, onOpenMusicSettings: () ->
                 .padding(horizontal = 6.dp),
         )
         Text(
-            text = "${active + 1} / $total",
+            text = "${active + 1} / $total" + if (controller.workMode) " · modo trabajo" else "",
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 4.dp),
@@ -653,16 +659,12 @@ private fun Controls(controller: AudiobookController, onOpenMusicSettings: () ->
                         modifier = Modifier.size(34.dp),
                     )
                 }
-                FilledIconButton(
-                    onClick = { controller.togglePlay() },
-                    modifier = Modifier.size(72.dp),
-                ) {
-                    Icon(
-                        modifier = Modifier.size(42.dp),
-                        imageVector = if (controller.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (controller.isPlaying) "Pausar" else "Reproducir línea",
-                    )
-                }
+                PlayButton(
+                    playing = controller.isPlaying,
+                    workMode = controller.workMode,
+                    onTap = { controller.togglePlay() },
+                    onHold = { controller.toggleWorkMode() },
+                )
                 IconButton(
                     onClick = { controller.step(1) },
                     modifier = Modifier.size(56.dp),
@@ -688,6 +690,80 @@ private fun Controls(controller: AudiobookController, onOpenMusicSettings: () ->
                 color = MaterialTheme.colorScheme.error,
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.labelSmall,
+            )
+        }
+    }
+}
+
+/** Seconds the play button must be held to switch work mode on or off. */
+private const val WORK_MODE_HOLD_MS = 10_000L
+
+/**
+ * Play/pause button. A tap plays or pauses; holding it for 10 seconds toggles work mode
+ * (a ring fills up while holding, and the phone vibrates when it triggers).
+ */
+@Composable
+private fun PlayButton(
+    playing: Boolean,
+    workMode: Boolean,
+    onTap: () -> Unit,
+    onHold: () -> Unit,
+) {
+    val haptics = LocalHapticFeedback.current
+    var holding by remember { mutableStateOf(false) }
+    val ring by animateFloatAsState(
+        targetValue = if (holding) 1f else 0f,
+        animationSpec = if (holding) tween(WORK_MODE_HOLD_MS.toInt(), easing = LinearEasing) else tween(150),
+        label = "workModeRing",
+    )
+    val container by animateColorAsState(
+        if (workMode) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+        animationSpec = tween(350),
+        label = "playContainer",
+    )
+    val content = if (workMode) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onPrimary
+    Box(
+        modifier = Modifier.size(80.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(container)
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown()
+                        holding = true
+                        var timedOut = true
+                        val up = withTimeoutOrNull(WORK_MODE_HOLD_MS) {
+                            waitForUpOrCancellation().also { timedOut = false }
+                        }
+                        if (!timedOut) {
+                            holding = false
+                            if (up != null) onTap()
+                        } else {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onHold()
+                            waitForUpOrCancellation()
+                            holding = false
+                        }
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                modifier = Modifier.size(42.dp),
+                imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                contentDescription = if (playing) "Pausar" else "Reproducir línea",
+                tint = content,
+            )
+        }
+        if (ring > 0f) {
+            CircularProgressIndicator(
+                progress = { ring },
+                modifier = Modifier.size(80.dp),
+                strokeWidth = 3.dp,
             )
         }
     }

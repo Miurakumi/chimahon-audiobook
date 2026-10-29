@@ -27,6 +27,7 @@ import kotlin.coroutines.resumeWithException
 /** Scene moods the background music can follow. */
 enum class Mood(val label: String, val color: Long) {
     FIGHT("Pelea", 0xFFE5484D),
+    TENSION("Tensión", 0xFFE0823D), // in between: tense scene, no fight yet
     CALM("Día a día", 0xFF4CAF7A), // CALM keeps its name so saved folders still work
     SAD("Tristeza", 0xFF4A7BD0),
     HOPE("Esperanza", 0xFFE8B23A),

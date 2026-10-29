@@ -340,6 +340,7 @@ class AutoMood(
 
         private val KEYWORDS = listOf(
             "FIGHT" to Mood.FIGHT,
+            "TENSION" to Mood.TENSION,
             "DAILY" to Mood.CALM,
             "SAD" to Mood.SAD,
             "HOPE" to Mood.HOPE,
@@ -349,7 +350,8 @@ class AutoMood(
         private const val SYSTEM_PROMPT =
             "You choose background music for passages of a Japanese novel. " +
                 "Read the passage and answer with exactly one word, no explanation: " +
-                "FIGHT (battle, danger, tension, anger), " +
+                "FIGHT (active battle, violence, chase, shouted anger), " +
+                "TENSION (suspense, unease, a standoff, danger approaching, waiting for something bad), " +
                 "DAILY (calm everyday life, ordinary conversation, description), " +
                 "SAD (sadness, loss, regret, loneliness), " +
                 "HOPE (determination, joy, warmth, resolution), " +
