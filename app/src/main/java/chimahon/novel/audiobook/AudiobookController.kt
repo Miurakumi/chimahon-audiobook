@@ -403,6 +403,12 @@ class AudiobookController(
         applyAutoMood(activeIndex)
     }
 
+    /** Deletes the detected moods (Auto turns off); the book can be analyzed again. */
+    fun clearAnalysis() {
+        autoMusic = false
+        auto.clearResults()
+    }
+
     /** A tap on a mood button: manual choice, so Auto turns off. */
     fun pickMood(mood: Mood) {
         autoMusic = false

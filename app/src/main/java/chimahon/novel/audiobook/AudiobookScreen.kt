@@ -146,6 +146,7 @@ fun AudiobookScreen(
         MusicDialog(
             music = controller.music,
             auto = controller.auto,
+            onClearAnalysis = { controller.clearAnalysis() },
             onDismiss = { showMusicDialog = false },
         )
     }
@@ -820,7 +821,12 @@ private fun MoodMenuItem(
 // ------------------------------------------------------------------ music settings
 
 @Composable
-private fun MusicDialog(music: BackgroundMusic, auto: AutoMood, onDismiss: () -> Unit) {
+private fun MusicDialog(
+    music: BackgroundMusic,
+    auto: AutoMood,
+    onClearAnalysis: () -> Unit,
+    onDismiss: () -> Unit,
+) {
     var pending by remember { mutableStateOf<Mood?>(null) }
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         val mood = pending
@@ -923,6 +929,12 @@ private fun MusicDialog(music: BackgroundMusic, auto: AutoMood, onDismiss: () ->
                             enabled = auto.chunks.isNotEmpty(),
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text("Analizar todo el libro") }
+                        if (auto.analyzedCount > 0) {
+                            TextButton(
+                                onClick = onClearAnalysis,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("Borrar análisis y empezar de nuevo") }
+                        }
                     }
                     if (auto.chunks.isEmpty()) {
                         Text("Cargá primero el audio y el SRT del libro.", style = MaterialTheme.typography.bodySmall)

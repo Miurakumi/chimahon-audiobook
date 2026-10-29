@@ -147,6 +147,16 @@ class AutoMood(
         status = null
     }
 
+    /** Throws away every detected mood so the book can be analyzed again from the start. */
+    fun clearResults() {
+        cancel()
+        labels = List(chunks.size) { "" }
+        secondsPerChunk = null
+        status = null
+        recompute()
+        save()
+    }
+
     fun cancel() {
         job?.cancel()
         job = null
