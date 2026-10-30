@@ -289,7 +289,7 @@ class AutoMood(
                                 out.toString()
                             }
                             val seconds = (System.currentTimeMillis() - started) / 1000f
-                            val label = parseMood(reply)?.name ?: "-"
+                            val label = refine(parseMood(reply), chunks[i].text)?.name ?: "-"
                             withContext(Dispatchers.Main) {
                                 labels = labels.toMutableList().also { it[i] = label }
                                 secondsPerChunk = secondsPerChunk?.let { it * 0.7f + seconds * 0.3f } ?: seconds
@@ -386,7 +386,30 @@ class AutoMood(
         return found.minByOrNull { it.first }?.second
     }
 
+    /**
+     * A small model over-picks FIGHT in adventure novels (guild, monsters, swords are just
+     * scenery there). So FIGHT is only kept when the text itself shows combat; with weaker
+     * signs it becomes TENSION, and with none it becomes DAILY.
+     */
+    private fun refine(mood: Mood?, text: String): Mood? {
+        if (mood != Mood.FIGHT) return mood
+        val clean = text.replace("素敵", "") // "lovely" contains the character for "enemy"
+        val cues = COMBAT_CUES.count { clean.contains(it) }
+        val exclamations = clean.count { it == '！' || it == '!' }
+        return when {
+            cues >= 2 || (cues >= 1 && exclamations >= 3) -> Mood.FIGHT
+            cues >= 1 || exclamations >= 3 -> Mood.TENSION
+            else -> Mood.CALM
+        }
+    }
+
     companion object {
+        /** Words that show real combat (not just fantasy scenery). Tune here if it misjudges. */
+        private val COMBAT_CUES = listOf(
+            "斬", "殴", "蹴", "攻撃", "剣を", "刃", "血", "叫", "倒す", "倒し", "倒さ", "敵",
+            "魔法", "詠唱", "爆", "衝撃", "咆哮", "突進", "悲鳴", "戦闘", "戦い", "振るっ", "避け",
+        )
+
         private const val MAX_CHUNK_LINES = 12
         private const val TARGET_CHUNK_CHARS = 260
         private const val MAX_CHUNK_CHARS = 320
@@ -402,13 +425,16 @@ class AutoMood(
         )
 
         private const val SYSTEM_PROMPT =
-            "You choose background music for passages of a Japanese novel. " +
-                "Read the passage and answer with exactly one word, no explanation: " +
-                "FIGHT (active battle, violence, chase, shouted anger), " +
-                "TENSION (suspense, unease, a standoff, danger approaching, waiting for something bad), " +
-                "DAILY (calm everyday life, ordinary conversation, description), " +
-                "SAD (sadness, loss, regret, loneliness), " +
-                "HOPE (determination, joy, warmth, resolution), " +
-                "COMEDY (jokes, silly situations, playful banter)."
+            "You pick background music for a passage of a Japanese adventure novel. " +
+                "Answer with exactly one word, no explanation. " +
+                "Most passages are DAILY. Choose another word only with clear evidence in the text. " +
+                "Fantasy scenery words (guild, dungeon, monsters, weapons, magic, adventurers) are " +
+                "normal background, they do NOT mean fighting. " +
+                "DAILY: talking, walking, eating, shopping, explaining, planning, describing. " +
+                "FIGHT: only when characters are hitting, slashing, casting attacks or being attacked right now. " +
+                "TENSION: danger is felt but nobody is fighting yet. " +
+                "SAD: grief, regret, loneliness. " +
+                "HOPE: determination, joy, warmth, promises. " +
+                "COMEDY: jokes, embarrassment, silly banter."
     }
 }
