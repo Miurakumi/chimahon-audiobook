@@ -86,4 +86,10 @@
     <string name="music_close">Cerrar</string>
     <string name="music_play_error">No se pudo reproducir esta canción (%1$s)</string>
     <string name="dial_model_crashed">La última vez el modelo cerró la app al abrirse. Si vuelve a pasar, probalo en un celu real (no en un emulador) o elegí otro archivo de modelo.</string>
+    <string name="song_lyrics_button">Letras</string>
+    <string name="song_dial_searching">Buscando letras…</string>
+    <string name="song_dial_not_found">No encontré letras para esta canción (o no hay internet). Podés elegir un archivo de letras (.lrc, .srt o .txt) de tu teléfono.</string>
+    <string name="song_dial_pick_file">Elegir archivo de letras</string>
+    <string name="song_dial_retry">Buscar de nuevo</string>
+    <string name="song_dial_back">Volver</string>
 </resources>

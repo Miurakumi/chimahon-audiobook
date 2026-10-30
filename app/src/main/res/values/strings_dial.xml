@@ -86,4 +86,10 @@
     <string name="music_close">Close</string>
     <string name="music_play_error">Couldn\'t play this song (%1$s)</string>
     <string name="dial_model_crashed">The model closed the app last time it was opened. If it happens again, try it on a real phone (not an emulator) or pick another model file.</string>
+    <string name="song_lyrics_button">Lyrics</string>
+    <string name="song_dial_searching">Searching lyrics…</string>
+    <string name="song_dial_not_found">Couldn\'t find lyrics for this song (or there is no internet). You can pick a lyrics file (.lrc, .srt or .txt) from your phone.</string>
+    <string name="song_dial_pick_file">Pick lyrics file</string>
+    <string name="song_dial_retry">Search again</string>
+    <string name="song_dial_back">Back</string>
 </resources>

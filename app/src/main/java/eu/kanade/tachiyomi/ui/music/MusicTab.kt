@@ -344,6 +344,9 @@ private fun MiniPlayer(track: MusicTrack) {
                 IconButton(onClick = { MusicPlayer.next(context) }) {
                     Icon(Icons.Filled.SkipNext, contentDescription = stringResource(R.string.music_next))
                 }
+                TextButton(onClick = { SongDialActivity.launch(context, track) }) {
+                    Text(stringResource(R.string.song_lyrics_button))
+                }
                 TextButton(onClick = { MusicPlayer.stop() }) {
                     Text(stringResource(R.string.music_close))
                 }

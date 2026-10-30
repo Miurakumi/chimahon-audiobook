@@ -580,7 +580,9 @@ private fun Controls(controller: AudiobookController, onOpenMusicSettings: () ->
                 .padding(horizontal = 6.dp),
         )
         Text(
-            text = "${active + 1} / $total" + if (controller.workMode) stringResource(R.string.dial_work_mode_suffix) else "",
+            text = "${active + 1} / $total" +
+                (controller.lines.getOrNull(active)?.let { " · " + formatClock(it.startMs.toLong()) } ?: "") +
+                if (controller.workMode) stringResource(R.string.dial_work_mode_suffix) else "",
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 4.dp),
@@ -983,4 +985,13 @@ private fun MusicDialog(
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.dial_done)) } },
     )
+}
+
+/** mm:ss (or h:mm:ss for long audiobooks): the position of a line inside the audio. */
+private fun formatClock(ms: Long): String {
+    val total = (ms / 1000).coerceAtLeast(0)
+    val h = total / 3600
+    val m = total / 60 % 60
+    val sec = total % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%02d:%02d".format(m, sec)
 }

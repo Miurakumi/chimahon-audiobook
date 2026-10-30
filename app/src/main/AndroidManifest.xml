@@ -197,6 +197,11 @@
             android:theme="@style/Theme.Tachiyomi" />
 
         <activity
+            android:name=".ui.music.SongDialActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Tachiyomi" />
+
+        <activity
             android:name="chimahon.novel.ui.reader.NovelReaderActivity"
             android:exported="false"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
