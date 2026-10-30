@@ -100,4 +100,7 @@
     <string name="dial_export_failed">Couldn\'t save the file (%1$s)</string>
     <string name="dial_import_empty">I found no lines like \"1-34 DAILY\" in that file.</string>
     <string name="dial_imported">Imported %1$d scenes.</string>
+    <string name="dial_mood_dial">Music dial</string>
+    <string name="dial_radial_active">On · tap to turn off</string>
+    <string name="dial_radial_pick">Tap to play</string>
 </resources>

@@ -1,6 +1,27 @@
 package chimahon.novel.audiobook
 
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.material.icons.filled.Album
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.animation.core.animate
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.roundToInt
+import kotlin.math.sin
 import eu.kanade.tachiyomi.R
 import androidx.compose.ui.res.stringResource
 import android.net.Uri
@@ -567,7 +588,7 @@ private fun DialLine(
 private fun Controls(controller: AudiobookController, onOpenMusicSettings: () -> Unit) {
     val total = controller.lines.size
     val active = controller.activeIndex
-    var menuOpen by remember { mutableStateOf(false) }
+    var dialOpen by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -596,77 +617,28 @@ private fun Controls(controller: AudiobookController, onOpenMusicSettings: () ->
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Menu: playback options and background music, instead of loose buttons.
-            Box {
-                IconButton(
-                    onClick = { menuOpen = true },
-                    modifier = Modifier.size(56.dp),
-                ) {
-                    Icon(
-                        Icons.Filled.Menu,
-                        contentDescription = stringResource(R.string.dial_menu),
-                        modifier = Modifier.size(30.dp),
-                    )
-                }
-                DropdownMenu(
-                    expanded = menuOpen,
-                    onDismissRequest = { menuOpen = false },
-                ) {
-                    MenuLabel(stringResource(R.string.dial_menu_playback))
-                    // These two cycle through their values and keep the menu open.
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                stringResource(
-                                    R.string.dial_mode_label,
-                                    stringResource(
-                                        when (controller.mode) {
-                                            PlayMode.ALL -> R.string.dial_mode_all
-                                            PlayMode.QUOTES -> R.string.dial_mode_quotes
-                                            PlayMode.MANUAL -> R.string.dial_mode_manual
-                                        },
-                                    ),
-                                ),
-                            )
-                        },
-                        onClick = { controller.cycleMode() },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.dial_speed, controller.state.speed.toString())) },
-                        onClick = { controller.cycleSpeed() },
-                    )
-                    HorizontalDivider()
-                    MenuLabel(stringResource(R.string.dial_music))
-                    MoodMenuItem(
-                        label = stringResource(if (controller.autoMusic) R.string.dial_auto_on else R.string.dial_auto),
-                        accent = Color(0xFF7C6CF0),
-                        selected = controller.autoMusic,
-                        onClick = {
-                            controller.toggleAuto()
-                            menuOpen = false
-                        },
-                    )
-                    Mood.entries.forEach { mood ->
-                        MoodMenuItem(
-                            label = stringResource(mood.labelRes),
-                            accent = Color(mood.color),
-                            selected = controller.music.mood == mood,
-                            onClick = {
-                                controller.pickMood(mood)
-                                menuOpen = false
-                            },
-                        )
-                    }
-                    HorizontalDivider()
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.dial_music_settings)) },
-                        leadingIcon = { Icon(Icons.Filled.MusicNote, contentDescription = null) },
-                        onClick = {
-                            menuOpen = false
-                            onOpenMusicSettings()
-                        },
-                    )
-                }
+            // Mood dial: opens a rotating ring with the moods (and Auto) around it.
+            IconButton(
+                onClick = { dialOpen = true },
+                modifier = Modifier.size(56.dp),
+            ) {
+                Icon(
+                    Icons.Filled.Album,
+                    contentDescription = stringResource(R.string.dial_mood_dial),
+                    modifier = Modifier.size(32.dp),
+                    tint = controller.music.mood?.let { Color(it.color) }
+                        ?: if (controller.autoMusic) Color(0xFF7C6CF0) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                )
+            }
+            if (dialOpen) {
+                MoodDialDialog(
+                    controller = controller,
+                    onOpenMusicSettings = {
+                        dialOpen = false
+                        onOpenMusicSettings()
+                    },
+                    onDismiss = { dialOpen = false },
+                )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1029,4 +1001,187 @@ private fun formatClock(ms: Long): String {
     val m = total / 60 % 60
     val sec = total % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%02d:%02d".format(m, sec)
+}
+
+// ------------------------------------------------------------------ mood dial
+
+private class DialSlot(val mood: Mood?, val label: String, val color: Color) // mood == null -> Auto
+
+/**
+ * A ring with the moods around it. Drag along the ring (or tap a mood) to turn it: the mood that
+ * stops at the top is the selected one, shown in the center. Tap the center to play it
+ * (tap again on the one that is playing to turn the music off).
+ */
+@Composable
+private fun MoodDialDialog(
+    controller: AudiobookController,
+    onOpenMusicSettings: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val autoLabel = stringResource(R.string.dial_auto)
+    val moodLabels = Mood.entries.map { stringResource(it.labelRes) }
+    val slots = remember(autoLabel, moodLabels) {
+        listOf(DialSlot(null, autoLabel, Color(0xFF7C6CF0))) +
+            Mood.entries.mapIndexed { i, m -> DialSlot(m, moodLabels[i], Color(m.color)) }
+    }
+    val n = slots.size
+    val step = 360f / n
+    val startIndex = if (controller.autoMusic) {
+        0
+    } else {
+        (controller.music.mood?.let { m -> slots.indexOfFirst { it.mood == m } } ?: 0).coerceAtLeast(0)
+    }
+    var offset by remember { mutableFloatStateOf(startIndex * step) }
+    val scope = rememberCoroutineScope()
+    val job = remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
+
+    fun animateTo(target: Float) {
+        job[0]?.cancel()
+        job[0] = scope.launch { animate(offset, target, animationSpec = tween(250)) { v, _ -> offset = v } }
+    }
+    fun snapNearest() = animateTo((offset / step).roundToInt() * step)
+
+    val selected = (((offset / step).roundToInt() % n) + n) % n
+    val slot = slots[selected]
+    val slotActive = if (slot.mood == null) {
+        controller.autoMusic
+    } else {
+        !controller.autoMusic && controller.music.mood == slot.mood
+    }
+    val onSurface = MaterialTheme.colorScheme.onSurface
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            tonalElevation = 6.dp,
+            modifier = Modifier.padding(16.dp),
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(300.dp)
+                        .pointerInput(Unit) {
+                            val c = Offset(size.width / 2f, size.height / 2f)
+                            detectDragGestures(
+                                onDragStart = { job[0]?.cancel() },
+                                onDragEnd = { snapNearest() },
+                                onDragCancel = { snapNearest() },
+                            ) { change, _ ->
+                                val prev = change.previousPosition - c
+                                val cur = change.position - c
+                                var d = Math.toDegrees((atan2(cur.y, cur.x) - atan2(prev.y, prev.x)).toDouble()).toFloat()
+                                if (d > 180f) d -= 360f
+                                if (d < -180f) d += 360f
+                                offset -= d
+                            }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // The ring, with a brighter wedge at the top (the selected slot).
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val ringR = 110.dp.toPx()
+                        val w = 72.dp.toPx()
+                        drawCircle(color = slot.color.copy(alpha = 0.16f), radius = ringR, style = Stroke(width = w))
+                        drawArc(
+                            color = slot.color.copy(alpha = 0.5f),
+                            startAngle = -90f - step / 2f,
+                            sweepAngle = step,
+                            useCenter = false,
+                            topLeft = Offset(center.x - ringR, center.y - ringR),
+                            size = Size(ringR * 2f, ringR * 2f),
+                            style = Stroke(width = w),
+                        )
+                    }
+                    slots.forEachIndexed { i, s ->
+                        val angle = Math.toRadians((-90f + i * step - offset).toDouble())
+                        val isSelected = i == selected
+                        val isActive = if (s.mood == null) controller.autoMusic else !controller.autoMusic && controller.music.mood == s.mood
+                        Box(
+                            modifier = Modifier
+                                .offset {
+                                    IntOffset(
+                                        (110.dp.toPx() * cos(angle)).roundToInt(),
+                                        (110.dp.toPx() * sin(angle)).roundToInt(),
+                                    )
+                                }
+                                .size(if (isSelected) 66.dp else 54.dp)
+                                .clip(CircleShape)
+                                .background(s.color.copy(alpha = if (isSelected) 0.95f else 0.4f))
+                                .then(if (isActive) Modifier.border(2.dp, onSurface, CircleShape) else Modifier)
+                                .clickable {
+                                    val k = i + n * (((offset / step) - i) / n).roundToInt()
+                                    animateTo(k * step)
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                s.label,
+                                fontSize = 10.sp,
+                                maxLines = 2,
+                                textAlign = TextAlign.Center,
+                                overflow = TextOverflow.Ellipsis,
+                                color = if (isSelected) Color.White else onSurface,
+                                modifier = Modifier.padding(horizontal = 3.dp),
+                            )
+                        }
+                    }
+                    // Center: the selected mood. Tap to play it.
+                    Box(
+                        modifier = Modifier
+                            .size(104.dp)
+                            .clip(CircleShape)
+                            .background(slot.color)
+                            .clickable {
+                                val mood = slot.mood
+                                if (mood == null) controller.toggleAuto() else controller.pickMood(mood)
+                                onDismiss()
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                slot.label,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.padding(horizontal = 8.dp),
+                            )
+                            Text(
+                                stringResource(if (slotActive) R.string.dial_radial_active else R.string.dial_radial_pick),
+                                color = Color.White.copy(alpha = 0.85f),
+                                fontSize = 9.sp,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                }
+
+                TextButton(onClick = { controller.cycleMode() }) {
+                    Text(
+                        stringResource(
+                            R.string.dial_mode_label,
+                            stringResource(
+                                when (controller.mode) {
+                                    PlayMode.ALL -> R.string.dial_mode_all
+                                    PlayMode.QUOTES -> R.string.dial_mode_quotes
+                                    PlayMode.MANUAL -> R.string.dial_mode_manual
+                                },
+                            ),
+                        ),
+                    )
+                }
+                TextButton(onClick = { controller.cycleSpeed() }) {
+                    Text(stringResource(R.string.dial_speed, controller.state.speed.toString()))
+                }
+                TextButton(onClick = onOpenMusicSettings) {
+                    Text(stringResource(R.string.dial_music_settings))
+                }
+            }
+        }
+    }
 }
