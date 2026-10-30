@@ -337,7 +337,11 @@ object SettingsAppearanceScreen : SearchableSettings {
             layout.getKeysForSection(eu.kanade.domain.ui.model.NavSection.NAVBAR)
                 .let { keys ->
                     if (Injekt.get<UiPreferences>().useConsolidatedLibrary().get()) {
-                        keys.filter { it != eu.kanade.domain.ui.model.NavTabLayout.KEY_NOVELS && it != eu.kanade.domain.ui.model.NavTabLayout.KEY_ANIME }
+                        keys.filter {
+                            it != eu.kanade.domain.ui.model.NavTabLayout.KEY_NOVELS &&
+                                it != eu.kanade.domain.ui.model.NavTabLayout.KEY_ANIME &&
+                                it != eu.kanade.domain.ui.model.NavTabLayout.KEY_MUSIC
+                        }
                     } else keys
                 }
                 .associateWith { key ->

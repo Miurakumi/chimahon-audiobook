@@ -125,11 +125,19 @@ import tachiyomi.source.local.isLocal
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
-enum class LibraryViewMode(val labelRes: StringResource) {
+enum class LibraryViewMode(val labelRes: StringResource?) {
     Manga(MR.strings.manga_singular),
     Anime(MR.strings.label_anime),
     Novels(MR.strings.label_novels),
+
+    /** Music has its own Android string (see strings_dial.xml), so it has no moko resource. */
+    Music(null),
 }
+
+/** The name shown for a library mode in the dropdown. */
+@Composable
+fun LibraryViewMode.label(): String = labelRes?.let { stringResource(it) }
+    ?: androidx.compose.ui.res.stringResource(R.string.music_tab)
 
 data object LibraryTab : Tab {
     @Suppress("unused")
@@ -164,6 +172,7 @@ data object LibraryTab : Tab {
             LibraryViewMode.Manga -> mangaSettingsEvent.send(Unit)
             LibraryViewMode.Anime -> animeSettingsEvent.send(Unit)
             LibraryViewMode.Novels -> novelSortEvent.send(Unit)
+            LibraryViewMode.Music -> Unit
         }
     }
 
@@ -246,6 +255,13 @@ data object LibraryTab : Tab {
                 entryTarget = entryTarget,
                 onEntryTargetConsumed = { entryTarget = null },
                 onBoundarySwipe = onBoundarySwipe,
+            )
+            LibraryViewMode.Music -> eu.kanade.tachiyomi.ui.music.MusicLibraryPanel(
+                libraryMode = libraryMode,
+                showModeDropdown = showModeDropdown,
+                onToggleDropdown = { showModeDropdown = true },
+                onDismissDropdown = { showModeDropdown = false },
+                onModeSelected = { mode -> selectMode(mode) },
             )
         }
     }
@@ -764,7 +780,7 @@ internal fun LibraryModeTitleContent(
                 DropdownMenuItem(
                     text = {
                         Text(
-                            text = stringResource(mode.labelRes),
+                            text = mode.label(),
                             fontWeight = if (mode == libraryMode) FontWeight.Bold else FontWeight.Normal,
                         )
                     },

@@ -96,7 +96,7 @@ data object MoreTab : Tab {
             moreTabKeys = {
                 val consolidated = Injekt.get<UiPreferences>().useConsolidatedLibrary().get()
                 NavTabLayout.parse(screenModel.moreTabKeys.value)
-                    .let { if (consolidated) NavTabLayout(it.entries.filter { e -> e.key != NavTabLayout.KEY_NOVELS && e.key != NavTabLayout.KEY_ANIME }) else it }
+                    .let { if (consolidated) NavTabLayout(it.entries.filter { e -> e.key != NavTabLayout.KEY_NOVELS && e.key != NavTabLayout.KEY_ANIME && e.key != NavTabLayout.KEY_MUSIC }) else it }
                     .getKeysForSection(NavSection.MORE)
             }(),
             // SY <--

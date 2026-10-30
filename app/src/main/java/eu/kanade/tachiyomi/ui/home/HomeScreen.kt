@@ -57,6 +57,7 @@ import eu.kanade.tachiyomi.ui.history.HistoryTab
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeTab
 import eu.kanade.tachiyomi.ui.library.LibraryTab
 import eu.kanade.tachiyomi.ui.library.LibraryViewMode
+import eu.kanade.tachiyomi.ui.library.label
 import eu.kanade.tachiyomi.ui.library.novels.NovelsTab
 import eu.kanade.tachiyomi.ui.libraryUpdateError.LibraryUpdateErrorScreen
 import eu.kanade.tachiyomi.ui.manga.MangaScreen
@@ -119,7 +120,10 @@ object HomeScreen : Screen() {
         val navbarTabs = remember(navTabLayoutStr, useConsolidatedLibrary) {
             val layout = NavTabLayout.parse(navTabLayoutStr)
             val navbarKeys = layout.getKeysForSection(NavSection.NAVBAR)
-                .filterNot { useConsolidatedLibrary && (it == NavTabLayout.KEY_NOVELS || it == NavTabLayout.KEY_ANIME) }
+                .filterNot {
+                    useConsolidatedLibrary &&
+                        (it == NavTabLayout.KEY_NOVELS || it == NavTabLayout.KEY_ANIME || it == NavTabLayout.KEY_MUSIC)
+                }
             navbarKeys.mapNotNull { ALL_TABS_MAP[it] } + listOf(MoreTab)
         }
 
@@ -331,7 +335,7 @@ object HomeScreen : Screen() {
                     DropdownMenuItem(
                         text = {
                             Text(
-                                text = stringResource(mode.labelRes),
+                                text = mode.label(),
                                 fontWeight = if (mode == selectedMode) FontWeight.Bold else FontWeight.Normal,
                             )
                         },

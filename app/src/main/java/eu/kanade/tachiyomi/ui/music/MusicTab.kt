@@ -50,7 +50,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.tab.TabOptions
 import eu.kanade.presentation.util.Tab
+import eu.kanade.presentation.library.components.LibraryToolbarTitle
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.ui.library.LibraryModeTitleContent
+import eu.kanade.tachiyomi.ui.library.LibraryViewMode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -70,6 +73,43 @@ data object MusicTab : Tab {
 
     @Composable
     override fun Content() {
+        MusicScreen(
+            titleContent = {
+                Text(
+                    stringResource(R.string.music_tab),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+            },
+        )
+    }
+}
+
+/** The Music screen inside the Library (the Manga / Anime / Novels / Music dropdown). */
+@Composable
+fun MusicLibraryPanel(
+    libraryMode: LibraryViewMode,
+    showModeDropdown: Boolean,
+    onToggleDropdown: () -> Unit,
+    onDismissDropdown: () -> Unit,
+    onModeSelected: (LibraryViewMode) -> Unit,
+) {
+    MusicScreen(
+        titleContent = {
+            LibraryModeTitleContent(
+                title = LibraryToolbarTitle(text = stringResource(R.string.music_tab)),
+                showModeDropdown = showModeDropdown,
+                onToggleDropdown = onToggleDropdown,
+                onDismissDropdown = onDismissDropdown,
+                libraryMode = libraryMode,
+                onModeSelected = onModeSelected,
+            )
+        },
+    )
+}
+
+@Composable
+private fun MusicScreen(titleContent: @Composable () -> Unit) {
+    run {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
         val folders = remember { mutableStateListOf<MusicFolder>() }
@@ -101,11 +141,7 @@ data object MusicTab : Tab {
                         .padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        stringResource(R.string.music_tab),
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.titleLarge,
-                    )
+                    Box(modifier = Modifier.weight(1f)) { titleContent() }
                     if (folders.isNotEmpty()) {
                         IconButton(onClick = { picker.launch(null) }) {
                             Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.music_add_folder))
