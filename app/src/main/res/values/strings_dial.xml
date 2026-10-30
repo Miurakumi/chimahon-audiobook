@@ -81,6 +81,8 @@
     <string name="music_play">Play</string>
     <string name="music_previous">Previous song</string>
     <string name="music_next">Next song</string>
+    <string name="music_sort_az">Sort: A → Z</string>
+    <string name="music_sort_za">Sort: Z → A</string>
     <string name="music_close">Close</string>
     <string name="music_play_error">Couldn\'t play this song (%1$s)</string>
     <string name="dial_model_crashed">The model closed the app last time it was opened. If it happens again, try it on a real phone (not an emulator) or pick another model file.</string>

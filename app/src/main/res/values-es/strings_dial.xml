@@ -81,6 +81,8 @@
     <string name="music_play">Reproducir</string>
     <string name="music_previous">Canción anterior</string>
     <string name="music_next">Canción siguiente</string>
+    <string name="music_sort_az">Orden: A → Z</string>
+    <string name="music_sort_za">Orden: Z → A</string>
     <string name="music_close">Cerrar</string>
     <string name="music_play_error">No se pudo reproducir esta canción (%1$s)</string>
     <string name="dial_model_crashed">La última vez el modelo cerró la app al abrirse. Si vuelve a pasar, probalo en un celu real (no en un emulador) o elegí otro archivo de modelo.</string>

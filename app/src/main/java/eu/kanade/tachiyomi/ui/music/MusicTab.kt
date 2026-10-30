@@ -49,7 +49,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.tab.TabOptions
+import eu.kanade.presentation.components.AppBar
+import eu.kanade.presentation.components.AppBarActions
+import eu.kanade.presentation.components.SearchToolbar
 import eu.kanade.presentation.util.Tab
+import kotlinx.collections.immutable.persistentListOf
+import tachiyomi.presentation.core.components.material.Scaffold
 import eu.kanade.presentation.library.components.LibraryToolbarTitle
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.ui.library.LibraryModeTitleContent
@@ -109,62 +114,82 @@ fun MusicLibraryPanel(
 
 @Composable
 private fun MusicScreen(titleContent: @Composable () -> Unit) {
-    run {
-        val context = LocalContext.current
-        val scope = rememberCoroutineScope()
-        val folders = remember { mutableStateListOf<MusicFolder>() }
-        var loading by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val folders = remember { mutableStateListOf<MusicFolder>() }
+    var loading by remember { mutableStateOf(true) }
+    var searchQuery by remember { mutableStateOf<String?>(null) }
+    var sortDescending by remember { mutableStateOf(false) }
 
-        // Load the saved folders once.
-        LaunchedEffect(Unit) {
-            loading = true
-            folders.clear()
-            MusicFolderStore.load(context).forEach { folders += MusicScanner.scan(context, it) }
-            loading = false
-        }
+    // Load the saved folders once.
+    LaunchedEffect(Unit) {
+        loading = true
+        folders.clear()
+        MusicFolderStore.load(context).forEach { folders += MusicScanner.scan(context, it) }
+        loading = false
+    }
 
-        val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
-            if (uri != null && folders.none { it.uri == uri }) {
-                MusicFolderStore.keepAccess(context, uri)
-                scope.launch {
-                    folders += MusicScanner.scan(context, uri)
-                    MusicFolderStore.save(context, folders.map { it.uri })
-                }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
+        if (uri != null && folders.none { it.uri == uri }) {
+            MusicFolderStore.keepAccess(context, uri)
+            scope.launch {
+                folders += MusicScanner.scan(context, uri)
+                MusicFolderStore.save(context, folders.map { it.uri })
             }
         }
+    }
 
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(modifier = Modifier.weight(1f)) { titleContent() }
-                    if (folders.isNotEmpty()) {
-                        IconButton(onClick = { picker.launch(null) }) {
-                            Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.music_add_folder))
-                        }
-                    }
-                }
+    // Back closes the search first.
+    androidx.activity.compose.BackHandler(enabled = searchQuery != null) { searchQuery = null }
 
-                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    when {
-                        loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                        folders.isEmpty() -> EmptyState(onAdd = { picker.launch(null) })
-                        else -> TrackList(
-                            folders = folders,
-                            onRemove = { folder ->
-                                MusicFolderStore.releaseAccess(context, folder.uri)
-                                folders.remove(folder)
-                                MusicFolderStore.save(context, folders.map { it.uri })
-                            },
-                        )
-                    }
-                }
+    // Songs shown: filtered by the search text and sorted.
+    val query = searchQuery?.trim().orEmpty()
+    val shown = folders.map { folder ->
+        val tracks = folder.tracks
+            .filter { query.isEmpty() || it.title.contains(query, ignoreCase = true) }
+            .let { list -> if (sortDescending) list.sortedByDescending { it.title.lowercase() } else list }
+        folder.copy(tracks = tracks)
+    }
 
-                MusicPlayer.current?.let { MiniPlayer(it) }
+    Scaffold(
+        topBar = { scrollBehavior ->
+            SearchToolbar(
+                titleContent = titleContent,
+                searchQuery = searchQuery,
+                onChangeSearchQuery = { searchQuery = it },
+                actions = {
+                    AppBarActions(
+                        persistentListOf(
+                            AppBar.Action(
+                                title = stringResource(R.string.music_add_folder),
+                                icon = Icons.Outlined.Add,
+                                onClick = { picker.launch(null) },
+                            ),
+                            AppBar.OverflowAction(
+                                title = stringResource(if (sortDescending) R.string.music_sort_az else R.string.music_sort_za),
+                                onClick = { sortDescending = !sortDescending },
+                            ),
+                        ),
+                    )
+                },
+                scrollBehavior = scrollBehavior,
+            )
+        },
+        bottomBar = { MusicPlayer.current?.let { MiniPlayer(it) } },
+    ) { padding ->
+        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+            when {
+                loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                folders.isEmpty() -> EmptyState(onAdd = { picker.launch(null) })
+                else -> TrackList(
+                    folders = shown,
+                    searching = query.isNotEmpty(),
+                    onRemove = { folder ->
+                        MusicFolderStore.releaseAccess(context, folder.uri)
+                        folders.removeAll { it.uri == folder.uri }
+                        MusicFolderStore.save(context, folders.map { it.uri })
+                    },
+                )
             }
         }
     }
@@ -190,10 +215,10 @@ private fun EmptyState(onAdd: () -> Unit) {
 }
 
 @Composable
-private fun TrackList(folders: List<MusicFolder>, onRemove: (MusicFolder) -> Unit) {
+private fun TrackList(folders: List<MusicFolder>, searching: Boolean, onRemove: (MusicFolder) -> Unit) {
     val context = LocalContext.current
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        folders.forEach { folder ->
+        folders.filter { !searching || it.tracks.isNotEmpty() }.forEach { folder ->
             item(key = "folder_${folder.uri}") {
                 Row(
                     modifier = Modifier
@@ -260,15 +285,16 @@ private fun TrackList(folders: List<MusicFolder>, onRemove: (MusicFolder) -> Uni
 private fun MiniPlayer(track: MusicTrack) {
     val context = LocalContext.current
     var position by remember { mutableStateOf(0) }
+    var duration by remember { mutableStateOf(0) }
     var dragging by remember { mutableStateOf(false) }
     var dragValue by remember { mutableStateOf(0f) }
     LaunchedEffect(track.uri) {
         while (true) {
             if (!dragging) position = MusicPlayer.positionMs
+            duration = MusicPlayer.durationMs
             delay(300)
         }
     }
-    val duration = MusicPlayer.durationMs
 
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
