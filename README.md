@@ -25,7 +25,7 @@ Inside the EPUB reader there is a headphones button that opens the audiobook dia
 - **Remembers your place**: last line, mode and speed are saved for each book.
 - **Your reader settings**: text size, line spacing, character spacing and font are taken from the reader.
 - **Anki**: `{sentence-audio}` gets the audio clip of the active line, and `{cover}` adds the book cover.
-- **Immersion mode**: background music by scene mood (Fight, Tension, Day to day, Sadness, Hope, Comedy). You choose one folder of your own music for each mood.
+- **Immersion mode**: background music by scene mood (Anime song, Comedy, Day to day, Emotional, Hope, Fight, Tension, Sadness). You choose one folder of your own music for each mood.
 
 ## Download
 

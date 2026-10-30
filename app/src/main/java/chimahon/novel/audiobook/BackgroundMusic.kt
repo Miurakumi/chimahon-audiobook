@@ -26,14 +26,19 @@ import java.io.File
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-/** Scene moods the background music can follow. */
-enum class Mood(@StringRes val labelRes: Int, val color: Long) {
+/**
+ * Scene moods the background music can follow. [auto] = the Auto detector may pick it
+ * (ANIME_SONG is manual only: the model would overuse it).
+ */
+enum class Mood(@StringRes val labelRes: Int, val color: Long, val auto: Boolean = true) {
+    ANIME_SONG(R.string.dial_mood_anime_song, 0xFF9C6BFF, auto = false),
+    COMEDY(R.string.dial_mood_comedy, 0xFFD65DB1),
+    CALM(R.string.dial_mood_calm, 0xFF4CAF7A), // CALM keeps its name so saved folders still work
+    EMOTIONAL(R.string.dial_mood_emotional, 0xFF2BB3C0), // scenes that need a very specific feeling
+    HOPE(R.string.dial_mood_hope, 0xFFE8B23A),
     FIGHT(R.string.dial_mood_fight, 0xFFE5484D),
     TENSION(R.string.dial_mood_tension, 0xFFE0823D), // in between: tense scene, no fight yet
-    CALM(R.string.dial_mood_calm, 0xFF4CAF7A), // CALM keeps its name so saved folders still work
     SAD(R.string.dial_mood_sad, 0xFF4A7BD0),
-    HOPE(R.string.dial_mood_hope, 0xFFE8B23A),
-    COMEDY(R.string.dial_mood_comedy, 0xFFD65DB1),
 }
 
 /** Global music settings (the same for every book): one folder per mood, and the volume. */

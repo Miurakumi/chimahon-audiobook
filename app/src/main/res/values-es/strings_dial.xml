@@ -7,6 +7,8 @@
     <string name="dial_mood_sad">Tristeza</string>
     <string name="dial_mood_hope">Esperanza</string>
     <string name="dial_mood_comedy">Comedia</string>
+    <string name="dial_mood_anime_song">Canción de anime</string>
+    <string name="dial_mood_emotional">Emotivo</string>
     <string name="dial_back">Volver al libro</string>
     <string name="dial_music">Música de fondo</string>
     <string name="dial_change_files">Cambiar archivos</string>

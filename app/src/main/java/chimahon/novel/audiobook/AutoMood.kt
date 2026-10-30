@@ -281,16 +281,19 @@ class AutoMood(
                         for (i in pending) {
                             ensureActive()
                             val started = System.currentTimeMillis()
+                            val previous = chunks.getOrNull(i - 1)?.text?.takeLast(PREVIOUS_CHARS).orEmpty()
+                            val message = "PREVIOUS:\n" + previous.ifBlank { "(start of the book)" } +
+                                "\n\nCURRENT:\n" + chunks[i].text + "\n/no_think"
                             val reply = engine.createConversation(
                                 ConversationConfig(systemInstruction = Contents.of(SYSTEM_PROMPT)),
                             ).use { conversation ->
                                 val out = StringBuilder()
-                                conversation.sendMessageAsync(chunks[i].text + "\n/no_think").collect { out.append(it.toString()) }
+                                conversation.sendMessageAsync(message).collect { out.append(it.toString()) }
                                 out.toString()
                             }
                             val seconds = (System.currentTimeMillis() - started) / 1000f
                             val label = (refine(parseMood(reply) ?: Mood.CALM, chunks[i].text) ?: Mood.CALM).name
-                            android.util.Log.d("AutoMood", "chunk $i reply=\"${reply.trim().take(60)}\" -> $label")
+                            android.util.Log.d("AutoMood", "chunk $i reply=\"${reply.trim().take(200).replace("\n", " | ")}\" -> $label")
                             withContext(Dispatchers.Main) {
                                 labels = labels.toMutableList().also { it[i] = label }
                                 secondsPerChunk = secondsPerChunk?.let { it * 0.7f + seconds * 0.3f } ?: seconds
@@ -380,7 +383,10 @@ class AutoMood(
 
     /** Finds the first mood word in the model's reply (ignoring any <think> block). */
     private fun parseMood(reply: String): Mood? {
-        val clean = reply.replace(Regex("<think>.*?</think>", RegexOption.DOT_MATCHES_ALL), "").uppercase()
+        val noThink = reply.replace(Regex("<think>.*?</think>", RegexOption.DOT_MATCHES_ALL), "").uppercase()
+        // The model writes a short summary first and the answer after "MOOD:".
+        val marker = noThink.lastIndexOf("MOOD:")
+        val clean = if (marker >= 0) noThink.substring(marker + 5) else noThink
         val found = KEYWORDS.mapNotNull { (word, mood) ->
             clean.indexOf(word).takeIf { it >= 0 }?.let { it to mood }
         }
@@ -390,7 +396,7 @@ class AutoMood(
     /**
      * A small model over-picks FIGHT in adventure novels (guild, monsters, swords are just
      * scenery there). So FIGHT is only kept when the text itself shows combat; with weaker
-     * signs it becomes TENSION, and with none it becomes DAILY.
+     * signs it becomes TENSION.
      */
     private fun refine(mood: Mood?, text: String): Mood? {
         val clean = text.replace("素敵", "") // "lovely" contains the character for "enemy"
@@ -400,15 +406,14 @@ class AutoMood(
                 val exclamations = clean.count { it == '！' || it == '!' }
                 when {
                     cues >= 2 || (cues >= 1 && exclamations >= 3) -> Mood.FIGHT
-                    cues >= 1 || exclamations >= 3 -> Mood.TENSION
-                    else -> Mood.CALM
+                    else -> Mood.TENSION
                 }
             }
             // Same idea for comedy: the model over-picks it, so it needs signs in the text.
             Mood.COMEDY -> {
                 val cues = COMEDY_CUES.count { clean.contains(it) }
                 val surprised = clean.contains("？！") || clean.contains("！？") || clean.contains("?!")
-                if (cues >= 2 || (cues >= 1 && surprised)) Mood.COMEDY else Mood.CALM
+                if (cues >= 1 || surprised) Mood.COMEDY else Mood.CALM
             }
             else -> mood
         }
@@ -431,6 +436,7 @@ class AutoMood(
         private const val TARGET_CHUNK_CHARS = 260
         private const val MAX_CHUNK_CHARS = 320
         private const val SAVE_EVERY = 3
+        private const val PREVIOUS_CHARS = 160
 
         /** Words the model may answer with (including near-synonyms) and the mood they mean. */
         private val KEYWORDS = listOf(
@@ -442,19 +448,25 @@ class AutoMood(
             "HOPE" to Mood.HOPE, "JOY" to Mood.HOPE, "DETERMINATION" to Mood.HOPE,
             "COMEDY" to Mood.COMEDY, "FUNNY" to Mood.COMEDY, "HUMOR" to Mood.COMEDY,
             "HUMOUR" to Mood.COMEDY, "JOKE" to Mood.COMEDY, "COMIC" to Mood.COMEDY,
+            "EMOTIONAL" to Mood.EMOTIONAL, "EMOTION" to Mood.EMOTIONAL, "TOUCHING" to Mood.EMOTIONAL,
+            "MOVING" to Mood.EMOTIONAL, "HEARTFELT" to Mood.EMOTIONAL, "ROMANTIC" to Mood.EMOTIONAL,
+            "NOSTALGI" to Mood.EMOTIONAL, "TENDER" to Mood.EMOTIONAL,
         )
 
         private const val SYSTEM_PROMPT =
-            "You pick background music for a passage of a Japanese adventure novel. " +
-                "Answer with exactly one word, no explanation. " +
-                "Most passages are DAILY. Choose another word only with clear evidence in the text. " +
-                "Fantasy scenery words (guild, dungeon, monsters, weapons, magic, adventurers) are " +
-                "normal background, they do NOT mean fighting. " +
-                "DAILY: talking, walking, eating, shopping, explaining, planning, describing. " +
-                "SAD: grief, regret, loneliness. " +
-                "HOPE: determination, joy, warmth, promises. " +
-                "COMEDY: only clear jokes, teasing or comic overreactions. A smile or a laugh alone is NOT comedy. " +
-                "TENSION: danger is felt but nobody is fighting yet. " +
-                "FIGHT: only when characters are hitting, slashing, casting attacks or being attacked right now."
+            "You choose the background music for a Japanese novel. You get PREVIOUS (the text just before, " +
+                "for context only) and CURRENT (the passage to judge). " +
+                "Step 1: in ONE short English sentence, summarize what is happening in CURRENT and how the " +
+                "atmosphere continues or changes from PREVIOUS. " +
+                "Step 2: on a new line write MOOD: followed by exactly one of these words. " +
+                "DAILY: ordinary talk, walking, eating, shopping, explaining, planning, describing places. " +
+                "COMEDY: jokes, teasing, silly misunderstandings, comic overreactions. " +
+                "EMOTIONAL: a moment that needs a very specific feeling: tender, touching, romantic, nostalgic, a heartfelt confession. " +
+                "HOPE: determination, promises, joy, a new goal, warm encouragement. " +
+                "SAD: grief, loss, regret, loneliness, crying. " +
+                "TENSION: danger, fear, secrets or a threat is felt, but nobody is fighting yet. " +
+                "FIGHT: characters are hitting, slashing, casting attacks or being attacked right now. " +
+                "Fantasy scenery (guild, dungeon, monsters, weapons, magic) is NOT fighting by itself. " +
+                "Judge the feeling of the scene, not single words. Pick DAILY only if nothing else fits."
     }
 }
