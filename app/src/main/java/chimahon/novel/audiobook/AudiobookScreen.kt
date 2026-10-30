@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.AlertDialog
@@ -697,8 +698,23 @@ private fun Controls(controller: AudiobookController, onOpenMusicSettings: () ->
                 }
             }
 
-            // Keeps the play controls centered (same width as the menu button).
-            Spacer(modifier = Modifier.size(56.dp))
+            // Loop: repeats the background track that is playing now (also keeps the play controls centered).
+            IconButton(
+                onClick = { controller.music.toggleLoop() },
+                enabled = controller.music.mood != null,
+                modifier = Modifier.size(56.dp),
+            ) {
+                Icon(
+                    Icons.Filled.RepeatOne,
+                    contentDescription = stringResource(R.string.dial_loop),
+                    modifier = Modifier.size(30.dp),
+                    tint = if (controller.music.loop) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = if (controller.music.mood != null) 0.7f else 0.3f)
+                    },
+                )
+            }
         }
 
         controller.music.message?.let {

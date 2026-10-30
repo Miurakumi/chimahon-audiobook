@@ -92,4 +92,5 @@
     <string name="song_dial_pick_file">Elegir archivo de letras</string>
     <string name="song_dial_retry">Buscar de nuevo</string>
     <string name="song_dial_back">Volver</string>
+    <string name="dial_loop">Repetir esta música de fondo</string>
 </resources>

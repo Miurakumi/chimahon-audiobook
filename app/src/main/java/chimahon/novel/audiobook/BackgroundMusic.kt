@@ -81,6 +81,10 @@ class BackgroundMusic(
     var mood by mutableStateOf<Mood?>(null)
         private set
 
+    /** True while the current background track repeats itself (the "loop" button). */
+    var loop by mutableStateOf(false)
+        private set
+
     /** A short problem message (missing folder, empty folder...) or null. */
     var message by mutableStateOf<String?>(null)
         private set
@@ -116,6 +120,13 @@ class BackgroundMusic(
 
     fun commitVolume() = MusicStore.save(context, config)
 
+    /** Repeats exactly the track that is playing now; call again to go back to normal. */
+    fun toggleLoop() {
+        if (player == null) return
+        loop = !loop
+        runCatching { player?.isLooping = loop }
+    }
+
     // ---------------------------------------------------------------- playback
 
     /** Picks a mood. Picking the one that is already playing turns the music off. */
@@ -131,6 +142,7 @@ class BackgroundMusic(
         if (target == mood && (target == null || player != null || switchJob?.isActive == true)) return
         mood = target
         message = null
+        loop = false // a new mood means a new track: the loop was for the old one
         switchJob?.cancel()
         val old = player
         player = null
@@ -170,6 +182,7 @@ class BackgroundMusic(
             return
         }
         mp.setVolume(0f, 0f)
+        mp.isLooping = loop
         mp.setOnCompletionListener {
             // Track ended: free it and play another one from the same folder.
             if (player === mp && mood == target) {
@@ -267,6 +280,7 @@ class BackgroundMusic(
         runCatching { player?.release() }
         player = null
         mood = null
+        loop = false
     }
 
     companion object {

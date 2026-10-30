@@ -92,4 +92,5 @@
     <string name="song_dial_pick_file">Pick lyrics file</string>
     <string name="song_dial_retry">Search again</string>
     <string name="song_dial_back">Back</string>
+    <string name="dial_loop">Repeat this background track</string>
 </resources>
