@@ -922,7 +922,7 @@ private fun MusicDialog(
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text(stringResource(R.string.dial_pick_model)) }
                     }
-                    else -> Text(stringResource(R.string.dial_model_ready), style = MaterialTheme.typography.bodySmall)
+                    else -> Text(stringResource(R.string.dial_model_ready, auto.modelSizeMb), style = MaterialTheme.typography.bodySmall)
                 }
                 if (auto.modelReady) {
                     Text(

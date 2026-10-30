@@ -31,16 +31,38 @@ data class MoodChunk(
     val text: String,
 )
 
-/** The small on-device model (Qwen3 0.6B, no-thinking build) used to detect moods. */
+/**
+ * The small on-device model (Qwen3 0.6B) used to detect moods. This is the official LiteRT
+ * community file, whose tokenizer was fixed on 2026-10-13 (older copies crash newer runtimes).
+ */
 object MoodModel {
 
-    private const val FILE_NAME = "qwen3_0.6b_nothink_q4_block32_ekv1280.litertlm"
+    private const val FILE_NAME = "Qwen3-0.6B.litertlm"
     private const val URL_STRING =
-        "https://huggingface.co/litert-community/Qwen3-0.6B-int4/resolve/main/$FILE_NAME"
+        "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/$FILE_NAME"
 
-    fun file(context: Context) = File(File(context.filesDir, "models").apply { mkdirs() }, FILE_NAME)
+    /** The real file is about 614 MB; anything much smaller is a broken download. */
+    private const val MIN_SIZE_BYTES = 400_000_000L
 
-    fun isReady(context: Context): Boolean = file(context).let { it.isFile && it.length() > 1_000_000L }
+    private fun dir(context: Context) = File(context.filesDir, "models").apply { mkdirs() }
+
+    fun file(context: Context) = File(dir(context), FILE_NAME)
+
+    /** Written just before the model is opened and removed right after: if it is still there on
+     *  the next start, the app was killed while opening the model. */
+    fun guardFile(context: Context) = File(dir(context), "engine_guard")
+
+    /** Deletes models from older versions of the app (they took space and no longer work). */
+    private fun deleteOldModels(context: Context) {
+        dir(context).listFiles()?.forEach {
+            if (it.name.endsWith(".litertlm") && it.name != FILE_NAME) it.delete()
+        }
+    }
+
+    fun isReady(context: Context): Boolean {
+        deleteOldModels(context)
+        return file(context).let { it.isFile && it.length() > MIN_SIZE_BYTES }
+    }
 
     /** Downloads the model. Throws on failure; [onProgress] gets 0f..1f (or -1f when unknown). */
     suspend fun download(context: Context, onProgress: (Float) -> Unit) = withContext(Dispatchers.IO) {
@@ -71,6 +93,9 @@ object MoodModel {
                         }
                     }
                 }
+            }
+            if (total > 0 && part.length() != total) {
+                throw IllegalStateException(context.getString(R.string.dial_model_incomplete))
             }
             target.delete()
             if (!part.renameTo(target)) throw IllegalStateException(context.getString(R.string.dial_err_save_model))
@@ -123,6 +148,18 @@ class AutoMood(
     private var effective by mutableStateOf<List<Mood?>>(emptyList())
     private var job: Job? = null
     private var savedLabels: List<String> = emptyList()
+
+    /** Size of the model file in MB, for the "Model ready" line. */
+    val modelSizeMb: Int get() = (MoodModel.file(context).length() / 1_000_000L).toInt()
+
+    init {
+        // The app was killed while opening the model last time: say so instead of failing silently.
+        val guard = MoodModel.guardFile(context)
+        if (guard.exists()) {
+            guard.delete()
+            status = context.getString(R.string.dial_model_crashed)
+        }
+    }
 
     val analyzedCount: Int get() = labels.count { it.isNotEmpty() }
 
@@ -233,7 +270,13 @@ class AutoMood(
                         cacheDir = context.cacheDir.path,
                     )
                     Engine(config).use { engine ->
-                        engine.initialize()
+                        val guard = MoodModel.guardFile(context)
+                        guard.writeText("1")
+                        try {
+                            engine.initialize()
+                        } finally {
+                            guard.delete()
+                        }
                         var sinceSave = 0
                         for (i in pending) {
                             ensureActive()
@@ -242,7 +285,7 @@ class AutoMood(
                                 ConversationConfig(systemInstruction = Contents.of(SYSTEM_PROMPT)),
                             ).use { conversation ->
                                 val out = StringBuilder()
-                                conversation.sendMessageAsync(chunks[i].text).collect { out.append(it.toString()) }
+                                conversation.sendMessageAsync(chunks[i].text + "\n/no_think").collect { out.append(it.toString()) }
                                 out.toString()
                             }
                             val seconds = (System.currentTimeMillis() - started) / 1000f
