@@ -713,11 +713,11 @@ private fun Controls(controller: AudiobookController, onOpenMusicSettings: () ->
     }
 }
 
-/** Seconds the play button must be held to switch work mode on or off. */
-private const val WORK_MODE_HOLD_MS = 10_000L
+/** How long the play button must be held to switch work mode on or off (change it here). */
+private const val WORK_MODE_HOLD_MS = 3_000L
 
 /**
- * Play/pause button. A tap plays or pauses; holding it for 10 seconds toggles work mode
+ * Play/pause button. A tap plays or pauses; holding it for 3 seconds toggles work mode
  * (a ring fills up while holding, and the phone vibrates when it triggers).
  */
 @Composable

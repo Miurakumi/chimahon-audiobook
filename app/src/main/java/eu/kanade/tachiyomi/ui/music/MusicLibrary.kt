@@ -116,6 +116,10 @@ object MusicPlayer {
     private var player: MediaPlayer? = null
     private var queue: List<MusicTrack> = emptyList()
 
+    /** True once the current song is ready. Asking position/duration before that makes
+     *  MediaPlayer report a bogus error (-38), which is what showed the red message. */
+    private var prepared = false
+
     var current by mutableStateOf<MusicTrack?>(null)
         private set
     var isPlaying by mutableStateOf(false)
@@ -132,6 +136,7 @@ object MusicPlayer {
     private fun start(context: Context, track: MusicTrack) {
         stopPlayer()
         error = null
+        prepared = false
         current = track
         val mp = MediaPlayer()
         try {
@@ -144,13 +149,16 @@ object MusicPlayer {
             mp.setDataSource(context, track.uri)
             mp.setOnPreparedListener {
                 if (player === mp) {
+                    prepared = true
+                    error = null
                     it.start()
                     isPlaying = true
                 }
             }
             mp.setOnCompletionListener { if (player === mp) next(context) }
             mp.setOnErrorListener { _, what, extra ->
-                if (player === mp) {
+                // -38 = "called in the wrong state": harmless, the song keeps playing.
+                if (player === mp && what != -38) {
                     error = "$what/$extra"
                     isPlaying = false
                 }
@@ -196,13 +204,13 @@ object MusicPlayer {
     }
 
     val positionMs: Int
-        get() = runCatching { player?.currentPosition ?: 0 }.getOrDefault(0)
+        get() = if (!prepared) 0 else runCatching { player?.currentPosition ?: 0 }.getOrDefault(0)
 
     val durationMs: Int
-        get() = runCatching { player?.duration?.coerceAtLeast(0) ?: 0 }.getOrDefault(0)
+        get() = if (!prepared) 0 else runCatching { player?.duration?.coerceAtLeast(0) ?: 0 }.getOrDefault(0)
 
     fun seekTo(ms: Int) {
-        runCatching { player?.seekTo(ms) }
+        if (prepared) runCatching { player?.seekTo(ms) }
     }
 
     fun stop() {

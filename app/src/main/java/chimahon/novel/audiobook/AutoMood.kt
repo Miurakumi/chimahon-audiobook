@@ -289,7 +289,8 @@ class AutoMood(
                                 out.toString()
                             }
                             val seconds = (System.currentTimeMillis() - started) / 1000f
-                            val label = refine(parseMood(reply), chunks[i].text)?.name ?: "-"
+                            val label = (refine(parseMood(reply) ?: Mood.CALM, chunks[i].text) ?: Mood.CALM).name
+                            android.util.Log.d("AutoMood", "chunk $i reply=\"${reply.trim().take(60)}\" -> $label")
                             withContext(Dispatchers.Main) {
                                 labels = labels.toMutableList().also { it[i] = label }
                                 secondsPerChunk = secondsPerChunk?.let { it * 0.7f + seconds * 0.3f } ?: seconds
@@ -392,14 +393,24 @@ class AutoMood(
      * signs it becomes TENSION, and with none it becomes DAILY.
      */
     private fun refine(mood: Mood?, text: String): Mood? {
-        if (mood != Mood.FIGHT) return mood
         val clean = text.replace("素敵", "") // "lovely" contains the character for "enemy"
-        val cues = COMBAT_CUES.count { clean.contains(it) }
-        val exclamations = clean.count { it == '！' || it == '!' }
-        return when {
-            cues >= 2 || (cues >= 1 && exclamations >= 3) -> Mood.FIGHT
-            cues >= 1 || exclamations >= 3 -> Mood.TENSION
-            else -> Mood.CALM
+        return when (mood) {
+            Mood.FIGHT -> {
+                val cues = COMBAT_CUES.count { clean.contains(it) }
+                val exclamations = clean.count { it == '！' || it == '!' }
+                when {
+                    cues >= 2 || (cues >= 1 && exclamations >= 3) -> Mood.FIGHT
+                    cues >= 1 || exclamations >= 3 -> Mood.TENSION
+                    else -> Mood.CALM
+                }
+            }
+            // Same idea for comedy: the model over-picks it, so it needs signs in the text.
+            Mood.COMEDY -> {
+                val cues = COMEDY_CUES.count { clean.contains(it) }
+                val surprised = clean.contains("？！") || clean.contains("！？") || clean.contains("?!")
+                if (cues >= 2 || (cues >= 1 && surprised)) Mood.COMEDY else Mood.CALM
+            }
+            else -> mood
         }
     }
 
@@ -410,18 +421,27 @@ class AutoMood(
             "魔法", "詠唱", "爆", "衝撃", "咆哮", "突進", "悲鳴", "戦闘", "戦い", "振るっ", "避け",
         )
 
+        /** Words that show a joke or comic reaction. A plain smile (笑った) alone is not enough. */
+        private val COMEDY_CUES = listOf(
+            "笑", "爆笑", "ツッコミ", "恥ずかし", "慌て", "あはは", "えへへ", "ふふ", "ははは",
+            "冗談", "照れ", "赤面", "顔を赤",
+        )
+
         private const val MAX_CHUNK_LINES = 12
         private const val TARGET_CHUNK_CHARS = 260
         private const val MAX_CHUNK_CHARS = 320
         private const val SAVE_EVERY = 3
 
+        /** Words the model may answer with (including near-synonyms) and the mood they mean. */
         private val KEYWORDS = listOf(
-            "FIGHT" to Mood.FIGHT,
-            "TENSION" to Mood.TENSION,
-            "DAILY" to Mood.CALM,
-            "SAD" to Mood.SAD,
-            "HOPE" to Mood.HOPE,
-            "COMEDY" to Mood.COMEDY,
+            "FIGHT" to Mood.FIGHT, "BATTLE" to Mood.FIGHT, "COMBAT" to Mood.FIGHT,
+            "TENSION" to Mood.TENSION, "TENSE" to Mood.TENSION, "SUSPENSE" to Mood.TENSION,
+            "DAILY" to Mood.CALM, "EVERYDAY" to Mood.CALM, "ORDINARY" to Mood.CALM,
+            "NORMAL" to Mood.CALM, "CALM" to Mood.CALM, "PEACEFUL" to Mood.CALM,
+            "SAD" to Mood.SAD, "GRIEF" to Mood.SAD, "SORROW" to Mood.SAD,
+            "HOPE" to Mood.HOPE, "JOY" to Mood.HOPE, "DETERMINATION" to Mood.HOPE,
+            "COMEDY" to Mood.COMEDY, "FUNNY" to Mood.COMEDY, "HUMOR" to Mood.COMEDY,
+            "HUMOUR" to Mood.COMEDY, "JOKE" to Mood.COMEDY, "COMIC" to Mood.COMEDY,
         )
 
         private const val SYSTEM_PROMPT =
@@ -431,10 +451,10 @@ class AutoMood(
                 "Fantasy scenery words (guild, dungeon, monsters, weapons, magic, adventurers) are " +
                 "normal background, they do NOT mean fighting. " +
                 "DAILY: talking, walking, eating, shopping, explaining, planning, describing. " +
-                "FIGHT: only when characters are hitting, slashing, casting attacks or being attacked right now. " +
-                "TENSION: danger is felt but nobody is fighting yet. " +
                 "SAD: grief, regret, loneliness. " +
                 "HOPE: determination, joy, warmth, promises. " +
-                "COMEDY: jokes, embarrassment, silly banter."
+                "COMEDY: only clear jokes, teasing or comic overreactions. A smile or a laugh alone is NOT comedy. " +
+                "TENSION: danger is felt but nobody is fighting yet. " +
+                "FIGHT: only when characters are hitting, slashing, casting attacks or being attacked right now."
     }
 }
