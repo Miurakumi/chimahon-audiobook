@@ -71,4 +71,14 @@
     <string name="dial_download_first">Download the model first.</string>
     <string name="dial_all_analyzed">Everything is already analyzed.</string>
     <string name="dial_analysis_failed">The analysis failed: %1$s</string>
+    <string name="music_tab">Music</string>
+    <string name="music_add_folder">Add folder</string>
+    <string name="music_empty_help">Add the folders where you keep your songs, then pick what to play.</string>
+    <string name="music_remove_folder">Remove folder from the list</string>
+    <string name="music_no_tracks">No songs found in this folder.</string>
+    <string name="music_play">Play</string>
+    <string name="music_previous">Previous song</string>
+    <string name="music_next">Next song</string>
+    <string name="music_close">Close</string>
+    <string name="music_play_error">Couldn\'t play this song (%1$s)</string>
 </resources>

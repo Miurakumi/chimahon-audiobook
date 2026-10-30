@@ -115,6 +115,7 @@ data object MoreTab : Tab {
             onClickDictionary = { navigator.push(eu.kanade.tachiyomi.ui.dictionary.DictionaryTab) },
             onClickNovels = { navigator.push(eu.kanade.tachiyomi.ui.library.novels.NovelsTab) },
             onClickAnime = { navigator.push(eu.kanade.tachiyomi.ui.entries.anime.AnimeTab) },
+            onClickMusic = { navigator.push(eu.kanade.tachiyomi.ui.music.MusicTab) },
             // SY <--
             // KMK -->
             onClickLibraryUpdateErrors = { navigator.push(LibraryUpdateErrorScreen()) },

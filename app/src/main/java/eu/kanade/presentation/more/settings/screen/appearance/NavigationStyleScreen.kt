@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Book
 import androidx.compose.material.icons.outlined.CollectionsBookmark
@@ -79,6 +80,7 @@ class NavigationStyleScreen : Screen() {
             NavTabLayout.KEY_HISTORY to stringResource(MR.strings.label_recent_manga),
             NavTabLayout.KEY_BROWSE to stringResource(MR.strings.browse),
             NavTabLayout.KEY_DICTIONARY to stringResource(MR.strings.label_dictionary),
+            NavTabLayout.KEY_MUSIC to androidx.compose.ui.res.stringResource(eu.kanade.tachiyomi.R.string.music_tab),
         )
 
         // Section titles
@@ -218,6 +220,7 @@ private fun getTabIcon(key: String): ImageVector {
         NavTabLayout.KEY_HISTORY -> Icons.Outlined.History
         NavTabLayout.KEY_BROWSE -> Icons.Outlined.Public
         NavTabLayout.KEY_DICTIONARY -> Icons.Outlined.Search
+        NavTabLayout.KEY_MUSIC -> Icons.Outlined.MusicNote
         else -> Icons.Outlined.Public
     }
 }

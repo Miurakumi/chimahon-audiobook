@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
@@ -88,6 +89,7 @@ fun MoreScreen(
     onClickDictionary: () -> Unit,
     onClickNovels: () -> Unit,
     onClickAnime: () -> Unit,
+    onClickMusic: () -> Unit,
     // KMK -->
     onClickLibraryUpdateErrors: () -> Unit,
     // KMK <--
@@ -235,6 +237,11 @@ fun MoreScreen(
                             title = stringResource(MR.strings.label_anime),
                             icon = Icons.Outlined.VideoLibrary,
                             onPreferenceClick = onClickAnime,
+                        )
+                        NavTabLayout.KEY_MUSIC -> TextPreferenceWidget(
+                            title = androidx.compose.ui.res.stringResource(eu.kanade.tachiyomi.R.string.music_tab),
+                            icon = Icons.Outlined.MusicNote,
+                            onPreferenceClick = onClickMusic,
                         )
                     }
                 }

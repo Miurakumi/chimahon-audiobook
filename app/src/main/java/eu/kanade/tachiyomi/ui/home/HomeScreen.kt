@@ -98,6 +98,7 @@ object HomeScreen : Screen() {
         NavTabLayout.KEY_HISTORY to HistoryTab,
         NavTabLayout.KEY_BROWSE to BrowseTab,
         NavTabLayout.KEY_DICTIONARY to DictionaryTab,
+        NavTabLayout.KEY_MUSIC to eu.kanade.tachiyomi.ui.music.MusicTab,
     )
 
     @Composable
@@ -222,6 +223,7 @@ object HomeScreen : Screen() {
                                 BrowseTab
                             }
                             Tab.Dictionary -> DictionaryTab
+                            Tab.Music -> eu.kanade.tachiyomi.ui.music.MusicTab
                             is Tab.More -> MoreTab
                         }
 
@@ -499,6 +501,7 @@ object HomeScreen : Screen() {
         data object Anime : Tab
         data class Browse(val toExtensions: Boolean = false) : Tab
         data object Dictionary : Tab
+        data object Music : Tab
         data class More(
             val toDownloads: Boolean,
             val toStats: Boolean = false,

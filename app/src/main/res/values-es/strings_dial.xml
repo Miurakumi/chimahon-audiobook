@@ -71,4 +71,14 @@
     <string name="dial_download_first">Primero bajá el modelo.</string>
     <string name="dial_all_analyzed">Ya está todo analizado.</string>
     <string name="dial_analysis_failed">El análisis falló: %1$s</string>
+    <string name="music_tab">Música</string>
+    <string name="music_add_folder">Agregar carpeta</string>
+    <string name="music_empty_help">Agregá las carpetas donde guardás tus canciones y después elegí cuál escuchar.</string>
+    <string name="music_remove_folder">Quitar carpeta de la lista</string>
+    <string name="music_no_tracks">No encontré canciones en esta carpeta.</string>
+    <string name="music_play">Reproducir</string>
+    <string name="music_previous">Canción anterior</string>
+    <string name="music_next">Canción siguiente</string>
+    <string name="music_close">Cerrar</string>
+    <string name="music_play_error">No se pudo reproducir esta canción (%1$s)</string>
 </resources>
