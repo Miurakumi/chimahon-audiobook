@@ -871,6 +871,12 @@ private fun MusicDialog(
     val modelPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) auto.importModel(uri)
     }
+    val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        if (uri != null) auto.exportTo(uri)
+    }
+    val moodFilePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) auto.importFrom(uri)
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.dial_music)) },
@@ -917,6 +923,19 @@ private fun MusicDialog(
                     stringResource(R.string.dial_auto_help),
                     style = MaterialTheme.typography.bodySmall,
                 )
+                // Better results: a bigger AI on a PC reads the file and writes the moods.
+                Text(stringResource(R.string.dial_pc_ai_help), style = MaterialTheme.typography.bodySmall)
+                OutlinedButton(
+                    onClick = { exportPicker.launch("moods_request.txt") },
+                    enabled = auto.chunks.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.dial_export_for_ai)) }
+                OutlinedButton(
+                    onClick = { moodFilePicker.launch(arrayOf("*/*")) },
+                    enabled = auto.chunks.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.dial_import_moods)) }
+                auto.notice?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                 val progress = auto.downloadProgress
                 when {
                     progress != null -> {

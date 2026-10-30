@@ -145,6 +145,13 @@ class AutoMood(
     var secondsPerChunk by mutableStateOf<Float?>(null)
         private set
 
+    /** A normal (non-error) message, e.g. "file saved". */
+    var notice by mutableStateOf<String?>(null)
+        private set
+
+    /** Every subtitle line of the book (one per line, same numbering as the dial counter). */
+    private var sourceLines: List<String> = emptyList()
+
     private var effective by mutableStateOf<List<Mood?>>(emptyList())
     private var job: Job? = null
     private var savedLabels: List<String> = emptyList()
@@ -169,6 +176,7 @@ class AutoMood(
     /** Called when the book's lines are loaded. [saved] are the labels stored for this book. */
     fun attach(lines: List<SrtLine>, saved: List<String>) {
         cancel()
+        sourceLines = lines.map { it.text.replace('\n', ' ').trim() }
         chunks = buildChunks(lines)
         labels = if (saved.size == chunks.size) saved else List(chunks.size) { "" }
         savedLabels = labels
@@ -179,10 +187,12 @@ class AutoMood(
     fun reset() {
         cancel()
         chunks = emptyList()
+        sourceLines = emptyList()
         labels = emptyList()
         effective = emptyList()
         savedLabels = emptyList()
         status = null
+        notice = null
     }
 
     /** Throws away every detected mood so the book can be analyzed again from the start. */
@@ -243,6 +253,64 @@ class AutoMood(
                 downloadProgress = null
             }
         }
+    }
+
+    // ---------------------------------------------------------------- PC AI file (export / import)
+
+    /** The whole book as numbered lines, with the instructions a bigger AI on a PC needs. */
+    fun exportText(): String = buildString {
+        append(EXPORT_PROMPT.replace("%N", sourceLines.size.toString()))
+        append("\n\n=== TEXT ===\n")
+        sourceLines.forEachIndexed { i, text -> append(i + 1).append(" | ").append(text).append('\n') }
+    }
+
+    /** Saves the export file where the user chose. */
+    fun exportTo(uri: Uri) {
+        notice = null
+        if (sourceLines.isEmpty()) {
+            status = context.getString(R.string.dial_load_files_first)
+            return
+        }
+        try {
+            context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(exportText().toByteArray(Charsets.UTF_8)) }
+                ?: throw IllegalStateException(context.getString(R.string.dial_err_save_model))
+            status = null
+            notice = context.getString(R.string.dial_exported)
+        } catch (e: Exception) {
+            status = context.getString(R.string.dial_export_failed, e.message ?: e.javaClass.simpleName)
+        }
+    }
+
+    /** Reads the AI's answer ("1-34 DAILY" lines) and sets the mood of every part it covers. */
+    fun importFrom(uri: Uri) {
+        notice = null
+        if (chunks.isEmpty()) {
+            status = context.getString(R.string.dial_load_files_first)
+            return
+        }
+        val text = runCatching {
+            context.contentResolver.openInputStream(uri)?.use { String(it.readBytes(), Charsets.UTF_8) }
+        }.getOrNull().orEmpty()
+        val ranges = RANGE_LINE.findAll(text).mapNotNull { m ->
+            val from = m.groupValues[1].toIntOrNull() ?: return@mapNotNull null
+            val to = m.groupValues[2].toIntOrNull() ?: return@mapNotNull null
+            val mood = parseMood(m.groupValues[3]) ?: return@mapNotNull null
+            Triple(minOf(from, to), maxOf(from, to), mood)
+        }.toList()
+        if (ranges.isEmpty()) {
+            status = context.getString(R.string.dial_import_empty)
+            return
+        }
+        val updated = labels.toMutableList()
+        for (i in chunks.indices) {
+            val line = chunks[i].start + 1
+            ranges.lastOrNull { line in it.first..it.second }?.let { updated[i] = it.third.name }
+        }
+        labels = updated
+        status = null
+        recompute()
+        save()
+        notice = context.getString(R.string.dial_imported, ranges.size)
     }
 
     // ---------------------------------------------------------------- analysis
@@ -438,6 +506,30 @@ class AutoMood(
         private const val SAVE_EVERY = 3
         private const val PREVIOUS_CHARS = 160
 
+        /** "1-34 DAILY", "**35 - 60**: FIGHT"... (markdown and extra words are tolerated). */
+        private val RANGE_LINE = Regex("""(\d+)\s*[-–—]\s*(\d+)[^A-Za-zÀ-ÿ\n]*([A-Za-zÀ-ÿ_ ]+)""")
+
+        /** Instructions placed at the top of the file for the PC AI. %N = number of lines. */
+        private const val EXPORT_PROMPT =
+            "TASK: I am listening to a Japanese audiobook and want background music that follows the scenes. " +
+                "Below, after '=== TEXT ===', the book is split into %N numbered lines (format: number | text). " +
+                "Read it, split it into scenes, and decide the mood of each scene by its overall feeling (what is happening, " +
+                "how the characters feel, what came before), not by single words.\n\n" +
+                "ANSWER FORMAT: only lines like  START-END MOOD  (line numbers, then one mood word). " +
+                "Example:\n1-34 DAILY\n35-52 TENSION\n53-80 FIGHT\n" +
+                "Cover every line from 1 to %N without gaps or overlaps. No explanations, no extra text. " +
+                "If the text is sent in parts, answer only for the numbers of that part.\n\n" +
+                "MOODS (use exactly these words):\n" +
+                "DAILY: ordinary talk, walking, eating, shopping, explaining, planning, describing places.\n" +
+                "COMEDY: jokes, teasing, silly misunderstandings, comic overreactions.\n" +
+                "EMOTIONAL: a moment that needs a very specific feeling: tender, touching, romantic, nostalgic, a heartfelt confession.\n" +
+                "HOPE: determination, promises, joy, a new goal, warm encouragement.\n" +
+                "SAD: grief, loss, regret, loneliness, crying.\n" +
+                "TENSION: danger, fear, secrets or a threat is felt, but nobody is fighting yet.\n" +
+                "FIGHT: characters are hitting, slashing, casting attacks or being attacked right now.\n" +
+                "Fantasy scenery (guild, dungeon, monsters, weapons, magic) is NOT fighting by itself. " +
+                "Pick DAILY only if nothing else fits."
+
         /** Words the model may answer with (including near-synonyms) and the mood they mean. */
         private val KEYWORDS = listOf(
             "FIGHT" to Mood.FIGHT, "BATTLE" to Mood.FIGHT, "COMBAT" to Mood.FIGHT,
@@ -451,6 +543,10 @@ class AutoMood(
             "EMOTIONAL" to Mood.EMOTIONAL, "EMOTION" to Mood.EMOTIONAL, "TOUCHING" to Mood.EMOTIONAL,
             "MOVING" to Mood.EMOTIONAL, "HEARTFELT" to Mood.EMOTIONAL, "ROMANTIC" to Mood.EMOTIONAL,
             "NOSTALGI" to Mood.EMOTIONAL, "TENDER" to Mood.EMOTIONAL,
+            "PELEA" to Mood.FIGHT, "TENSIÓN" to Mood.TENSION, "DÍA A DÍA" to Mood.CALM,
+            "DIA A DIA" to Mood.CALM, "TRISTEZA" to Mood.SAD, "TRISTE" to Mood.SAD,
+            "ESPERANZA" to Mood.HOPE, "COMEDIA" to Mood.COMEDY, "EMOTIVO" to Mood.EMOTIONAL,
+            "EMOCIONAL" to Mood.EMOTIONAL,
         )
 
         private const val SYSTEM_PROMPT =

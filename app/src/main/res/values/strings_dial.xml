@@ -93,4 +93,11 @@
     <string name="song_dial_retry">Search again</string>
     <string name="song_dial_back">Back</string>
     <string name="dial_loop">Repeat this background track</string>
+    <string name="dial_pc_ai_help">Best results: export the book, give the file to an AI running on your PC (for example in LM Studio or Ollama), save its answer as a text file and import it here.</string>
+    <string name="dial_export_for_ai">Export book for PC AI</string>
+    <string name="dial_import_moods">Import moods from AI answer</string>
+    <string name="dial_exported">File saved. Give it to your PC AI (if it is too long, send it in parts and join the answers in one file).</string>
+    <string name="dial_export_failed">Couldn\'t save the file (%1$s)</string>
+    <string name="dial_import_empty">I found no lines like \"1-34 DAILY\" in that file.</string>
+    <string name="dial_imported">Imported %1$d scenes.</string>
 </resources>
