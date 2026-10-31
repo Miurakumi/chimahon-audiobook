@@ -29,6 +29,9 @@ data class SongInfo(
 /** Turns lyrics in any common shape (LRC with times, SRT, plain text) into SRT text. */
 object LrcConverter {
 
+    /** "作词 : xxx", "作曲 : xxx"... credit lines some services put at the start of the lyrics. */
+    private val CREDIT_LINE = Regex("""^(作词|作詞|作曲|编曲|編曲|词|詞|曲|歌|唄|歌手|制作人|Lyrics?|Composer|Arranger|Music|Words)\s*[:：]""", RegexOption.IGNORE_CASE)
+
     private val TIME_TAG = Regex("""\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?]""")
 
     /** Returns SRT text, or null when [raw] has no usable lines. */
@@ -41,6 +44,7 @@ object LrcConverter {
             val tags = TIME_TAG.findAll(line).toList()
             if (tags.isEmpty()) continue
             val content = line.substring(tags.last().range.last + 1).trim()
+            if (CREDIT_LINE.containsMatchIn(content)) continue
             for (tag in tags) {
                 val minutes = tag.groupValues[1].toLong()
                 val seconds = tag.groupValues[2].toLong()
@@ -97,6 +101,7 @@ object LrcLib {
 
     /** A found lyrics must be this close (seconds) to the real length of the song. */
     private const val DURATION_TOLERANCE_S = 4.0
+    private const val NETEASE_TOLERANCE_S = 5.0
 
     private data class Hit(val title: String, val artist: String, val ms: Long)
 
@@ -124,10 +129,17 @@ object LrcLib {
                 }
 
                 // 3) Ask a music catalog what the song really is, then search with that.
-                for (hit in catalog(base)) {
+                val hits = catalog(base)
+                for (hit in hits) {
                     val sec = if (seconds > 0) seconds else hit.ms / 1000.0
                     exact(hit.title, hit.artist, null, sec)?.let { return@runCatching it }
                     searchTrack(hit.title, hit.artist, sec)?.let { return@runCatching it }
+                }
+
+                // 4) Second source: NetEase Cloud Music (big anime catalog, unofficial access).
+                val neteaseQueries = listOf(base) + hits.take(3).map { "${it.title} ${it.artist}" }
+                for (query in neteaseQueries.distinct()) {
+                    netease(query, seconds)?.let { return@runCatching it }
                 }
                 null
             }.getOrNull()
@@ -198,12 +210,41 @@ object LrcLib {
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
-    private fun request(url: String): String? {
+    /** NetEase search + lyric. Only songs of (almost) the same length are accepted. */
+    private fun netease(query: String, seconds: Double): String? {
+        val body = request(
+            "https://music.163.com/api/search/get/web?csrf_token=&hlpretag=&hlposttag=&s=${enc(query)}&type=1&offset=0&total=true&limit=6",
+            browser = true,
+        ) ?: return null
+        val songs = JSONObject(body).optJSONObject("result")?.optJSONArray("songs") ?: return null
+        val candidates = (0 until songs.length()).map { songs.getJSONObject(it) }
+        fun lengthS(o: JSONObject) = o.optDouble("duration", 0.0) / 1000.0
+        val near = (if (seconds > 0) candidates.filter { abs(lengthS(it) - seconds) <= NETEASE_TOLERANCE_S } else candidates)
+            .sortedBy { abs(lengthS(it) - seconds) }
+        for (song in near.take(3)) {
+            val lyricBody = request(
+                "https://music.163.com/api/song/lyric?id=${song.optLong("id")}&lv=-1&kv=-1&tv=-1",
+                browser = true,
+            ) ?: continue
+            val lrc = JSONObject(lyricBody).optJSONObject("lrc")?.optString("lyric").orEmpty()
+            // Skip "instrumental" placeholders and nearly empty results.
+            if (lrc.contains("纯音乐") || lrc.lines().count { it.isNotBlank() } < 6) continue
+            return lrc
+        }
+        return null
+    }
+
+    private fun request(url: String, browser: Boolean = false): String? {
         val connection = URL(url).openConnection() as HttpURLConnection
         return try {
             connection.connectTimeout = 10_000
             connection.readTimeout = 15_000
-            connection.setRequestProperty("User-Agent", USER_AGENT)
+            if (browser) {
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124 Mobile Safari/537.36")
+                connection.setRequestProperty("Referer", "https://music.163.com/")
+            } else {
+                connection.setRequestProperty("User-Agent", USER_AGENT)
+            }
             if (connection.responseCode != 200) null else connection.inputStream.bufferedReader().use { it.readText() }
         } catch (e: Exception) {
             null
