@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Folder
@@ -425,7 +426,7 @@ private fun FolderGrid(
                 }
             }
         }
-        items(folders, key = { it.uri.toString() }) { folder ->
+        gridItems(folders, key = { it.uri.toString() }) { folder ->
             FolderCard(folder = folder, onOpen = { onOpen(folder) }, onRemove = { onRemove(folder) })
         }
     }
