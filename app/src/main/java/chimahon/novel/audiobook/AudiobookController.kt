@@ -350,9 +350,16 @@ class AudiobookController(
         if (isPlaying) {
             workMode = false
             pause()
-        } else if (continuousMode && positionMs > 0 && positionMs < durationMs - 500 && player != null) {
-            // Song mode: continue from where it was paused instead of replaying the line.
-            startPlayer(player!!)
+        } else if (continuousMode && player != null) {
+            // Song mode: play from where it is (0:00 at the start); at the end, start over.
+            val mp = player!!
+            if (durationMs > 0 && positionMs >= durationMs - 500) {
+                runCatching { mp.seekTo(0) }
+                positionMs = 0
+                activeIndex = 0
+                persist()
+            }
+            startPlayer(mp)
         } else {
             playLine(activeIndex)
         }

@@ -91,6 +91,10 @@ fun SongLyricsScreen(
     val controller = remember(bookKey) {
         AudiobookController(context, bookKey, scope).also { it.continuousMode = true }
     }
+    // A song always opens at its beginning (0:00), not at the line saved last time.
+    LaunchedEffect(controller.ready) {
+        if (controller.ready) controller.seekToMs(0)
+    }
     DisposableEffect(controller) {
         onDispose {
             AudiobookMining.provider = null
