@@ -88,7 +88,7 @@
     <string name="dial_model_crashed">La última vez el modelo cerró la app al abrirse. Si vuelve a pasar, probalo en un celu real (no en un emulador) o elegí otro archivo de modelo.</string>
     <string name="song_lyrics_button">Letras</string>
     <string name="song_dial_searching">Buscando letras…</string>
-    <string name="song_dial_not_found">No encontré letras para esta canción (o no hay internet). Podés elegir un archivo de letras (.lrc, .srt o .txt) de tu teléfono.</string>
+    <string name="song_dial_not_found">No encontré letras en internet. Probá con otro nombre, pegalas o elegí un archivo.</string>
     <string name="song_dial_pick_file">Elegir archivo de letras</string>
     <string name="song_dial_retry">Buscar con este nombre</string>
     <string name="song_dial_back">Volver</string>
@@ -107,4 +107,11 @@
     <string name="music_shuffle_all">Aleatorio (todo)</string>
     <string name="music_shuffle">Aleatorio</string>
     <string name="music_song_count">%1$d canciones</string>
+    <string name="song_dial_paste">Pegar letra</string>
+    <string name="song_dial_paste_sub">Copiala de cualquier sitio web</string>
+    <string name="song_dial_file_sub">.lrc, .srt o .txt de tu teléfono</string>
+    <string name="song_dial_paste_hint">Pegá la letra acá</string>
+    <string name="song_dial_paste_note">Sin tiempos, las líneas se reparten a lo largo de la canción. Las líneas que empiezan como [01:23.45] conservan sus tiempos.</string>
+    <string name="song_dial_save">Guardar</string>
+    <string name="song_dial_cancel">Cancelar</string>
 </resources>

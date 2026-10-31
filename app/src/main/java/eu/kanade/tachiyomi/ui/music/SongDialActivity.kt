@@ -115,16 +115,7 @@ class SongDialActivity : ComponentActivity() {
             TachiyomiTheme {
                 Box(modifier = Modifier.fillMaxSize()) {
                     when (phase) {
-                        Phase.Loading -> Surface(modifier = Modifier.fillMaxSize()) {
-                            Column(
-                                modifier = Modifier.fillMaxSize().statusBarsPadding().padding(32.dp),
-                                verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                CircularProgressIndicator()
-                                Text(stringResource(R.string.song_dial_searching), textAlign = TextAlign.Center)
-                            }
-                        }
+                        Phase.Loading -> SongLoadingPane(info?.title ?: songTitle, info?.artist, cover)
                         Phase.Missing -> MissingPane()
                         Phase.Ready -> SongLyricsScreen(
                             bookKey = key,
@@ -173,6 +164,17 @@ class SongDialActivity : ComponentActivity() {
         }
     }
 
+    private fun pasteLyrics(text: String) {
+        val song = info ?: return
+        phase = Phase.Loading
+        lifecycleScope.launch {
+            when (val result = LyricsResolver.importText(this@SongDialActivity, text, song, key)) {
+                is LyricsResolver.Result.Found -> openDial(result, resetPosition = true)
+                LyricsResolver.Result.NotFound -> phase = Phase.Missing
+            }
+        }
+    }
+
     /** Writes the song + lyrics into the dial's saved state, then shows the dial. */
     private fun openDial(found: LyricsResolver.Result.Found, resetPosition: Boolean) {
         val saved = AudiobookStore.load(this, key)
@@ -196,37 +198,16 @@ class SongDialActivity : ComponentActivity() {
         val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) importLyrics(uri)
         }
-        Surface(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier.fillMaxSize().statusBarsPadding().padding(32.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(songTitle, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-                Text(
-                    stringResource(R.string.song_dial_not_found),
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                )
-                Button(onClick = { picker.launch(arrayOf("*/*")) }) {
-                    Text(stringResource(R.string.song_dial_pick_file))
-                }
-                var query by remember { mutableStateOf(LyricsResolver.cleanName(songTitle)) }
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    label = { Text(stringResource(R.string.song_dial_search_hint)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedButton(onClick = { findLyrics(query) }) {
-                    Text(stringResource(R.string.song_dial_retry))
-                }
-                OutlinedButton(onClick = { finish() }) {
-                    Text(stringResource(R.string.song_dial_back))
-                }
-            }
-        }
+        SongMissingPane(
+            title = info?.title ?: songTitle,
+            artist = info?.artist,
+            cover = cover,
+            initialQuery = LyricsResolver.cleanName(songTitle),
+            onSearch = { findLyrics(it) },
+            onPaste = { pasteLyrics(it) },
+            onPickFile = { picker.launch(arrayOf("*/*")) },
+            onBack = { finish() },
+        )
     }
 
     // ---------------------------------------------------------------- dictionary popup

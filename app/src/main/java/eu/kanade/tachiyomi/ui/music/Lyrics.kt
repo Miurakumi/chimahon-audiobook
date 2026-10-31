@@ -74,12 +74,20 @@ object LrcConverter {
                 add(start, end, entry.second)
             }
         } else {
-            // No times at all: spread the lines over the song (rough, but readable and tappable).
+            // No times at all: spread the lines over the song, longer lines getting more time, and
+            // leaving a little room at the start and end for the intro and outro (a rough guess).
             val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("[") }
             if (lines.isEmpty()) return null
             val span = if (durationMs > 0) durationMs else lines.size * 4000L
+            val from = (span * 0.06).toLong()
+            val to = (span * 0.96).toLong()
+            val weights = lines.map { maxOf(it.length, 4).toLong() }
+            val total = weights.sum()
+            var acc = 0L
             for ((i, content) in lines.withIndex()) {
-                add(span * i / lines.size, span * (i + 1) / lines.size, content)
+                val start = from + (to - from) * acc / total
+                acc += weights[i]
+                add(start, from + (to - from) * acc / total, content)
             }
         }
         return if (index == 0) null else result.toString()
@@ -337,6 +345,19 @@ object LyricsResolver {
                 val cache = cacheFile(context, key)
                 cache.writeText(srt)
                 Result.Found(cache, "file")
+            }
+        }
+
+    /** Converts lyrics pasted by the user and stores them for this song. */
+    suspend fun importText(context: Context, text: String, info: SongInfo, key: String): Result =
+        withContext(Dispatchers.IO) {
+            val srt = LrcConverter.toSrt(text, info.durationMs)
+            if (srt == null) {
+                Result.NotFound
+            } else {
+                val cache = cacheFile(context, key)
+                cache.writeText(srt)
+                Result.Found(cache, "paste")
             }
         }
 
