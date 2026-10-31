@@ -20,6 +20,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -150,13 +152,13 @@ class SongDialActivity : ComponentActivity() {
 
     // ---------------------------------------------------------------- lyrics
 
-    private fun findLyrics() {
+    private fun findLyrics(query: String? = null) {
         phase = Phase.Loading
         lifecycleScope.launch {
             val song = withContext(Dispatchers.IO) { LyricsResolver.readInfo(this@SongDialActivity, songUri, songTitle) }
             info = song
             cover = song.cover
-            when (val result = LyricsResolver.resolve(this@SongDialActivity, songUri, song, songTitle, key)) {
+            when (val result = LyricsResolver.resolve(this@SongDialActivity, songUri, song, songTitle, key, query)) {
                 is LyricsResolver.Result.Found -> openDial(result, resetPosition = false)
                 LyricsResolver.Result.NotFound -> phase = Phase.Missing
             }
@@ -212,7 +214,15 @@ class SongDialActivity : ComponentActivity() {
                 Button(onClick = { picker.launch(arrayOf("*/*")) }) {
                     Text(stringResource(R.string.song_dial_pick_file))
                 }
-                OutlinedButton(onClick = { findLyrics() }) {
+                var query by remember { mutableStateOf(LyricsResolver.cleanName(songTitle)) }
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text(stringResource(R.string.song_dial_search_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedButton(onClick = { findLyrics(query) }) {
                     Text(stringResource(R.string.song_dial_retry))
                 }
                 OutlinedButton(onClick = { finish() }) {

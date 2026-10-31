@@ -90,7 +90,7 @@
     <string name="song_dial_searching">Buscando letras…</string>
     <string name="song_dial_not_found">No encontré letras para esta canción (o no hay internet). Podés elegir un archivo de letras (.lrc, .srt o .txt) de tu teléfono.</string>
     <string name="song_dial_pick_file">Elegir archivo de letras</string>
-    <string name="song_dial_retry">Buscar de nuevo</string>
+    <string name="song_dial_retry">Buscar con este nombre</string>
     <string name="song_dial_back">Volver</string>
     <string name="dial_loop">Repetir esta música de fondo</string>
     <string name="dial_pc_ai_help">Mejores resultados: exportá el libro, dale el archivo a una IA que corra en tu PC (por ejemplo en LM Studio u Ollama), guardá su respuesta como archivo de texto e importala acá.</string>
@@ -103,4 +103,5 @@
     <string name="dial_mood_dial">Dial de música</string>
     <string name="dial_radial_active">Activo · tocá para apagar</string>
     <string name="dial_radial_pick">Tocá para activar</string>
+    <string name="song_dial_search_hint">Nombre de la canción, o artista - título</string>
 </resources>

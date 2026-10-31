@@ -95,41 +95,97 @@ object LrcLib {
     private const val BASE = "https://lrclib.net/api/"
     private const val USER_AGENT = "ChimahonDial/1.0 (https://github.com/Miurakumi/chimahon-audiobook)"
 
-    /** Lyrics text (with times when available) or null when nothing was found. */
-    suspend fun find(info: SongInfo, cleanedName: String): String? = withContext(Dispatchers.IO) {
-        val seconds = (info.durationMs / 1000).toInt()
-        runCatching {
-            // 1) Exact match when the file has title + artist tags.
-            if (info.tagged && !info.artist.isNullOrBlank()) {
-                val url = BASE + "get?track_name=${enc(info.title)}&artist_name=${enc(info.artist)}" +
-                    (info.album?.takeIf { it.isNotBlank() }?.let { "&album_name=${enc(it)}" } ?: "") +
-                    (if (seconds > 0) "&duration=$seconds" else "")
-                request(url)?.let { body ->
-                    pick(JSONObject(body))?.let { return@runCatching it }
+    /** A found lyrics must be this close (seconds) to the real length of the song. */
+    private const val DURATION_TOLERANCE_S = 4.0
+
+    private data class Hit(val title: String, val artist: String, val ms: Long)
+
+    /**
+     * Lyrics text (with times when available) or null. Tries, in order: the file tags, several
+     * spellings of the name, and finally a music catalog (iTunes) that fixes the real title/artist.
+     * [manualQuery] is what the user typed when the automatic search failed.
+     */
+    suspend fun find(info: SongInfo, cleanedName: String, manualQuery: String? = null): String? =
+        withContext(Dispatchers.IO) {
+            val seconds = info.durationMs / 1000.0
+            runCatching {
+                val typed = manualQuery?.trim()?.takeIf { it.isNotEmpty() }
+
+                // 1) Exact match with the file tags.
+                if (typed == null && info.tagged && !info.artist.isNullOrBlank()) {
+                    exact(info.title, info.artist, info.album, seconds)?.let { return@runCatching it }
+                    searchTrack(info.title, info.artist, seconds)?.let { return@runCatching it }
                 }
-            }
-            // 2) Search by tags, then by the file name.
-            val searches = buildList {
-                if (info.tagged && !info.artist.isNullOrBlank()) {
-                    add(BASE + "search?track_name=${enc(info.title)}&artist_name=${enc(info.artist)}")
+
+                // 2) Several spellings of the name.
+                val base = typed ?: cleanedName
+                for (query in variants(base)) {
+                    searchText(query, seconds)?.let { return@runCatching it }
                 }
-                add(BASE + "search?q=${enc(cleanedName)}")
-                if (info.tagged) add(BASE + "search?q=${enc(info.title)}")
-            }
-            for (url in searches) {
-                val body = request(url) ?: continue
-                val results = JSONArray(body)
-                val candidates = (0 until results.length()).map { results.getJSONObject(it) }
-                val ordered = if (seconds > 0) {
-                    candidates.sortedBy { abs(it.optDouble("duration", 0.0) - seconds) }
-                } else {
-                    candidates
+
+                // 3) Ask a music catalog what the song really is, then search with that.
+                for (hit in catalog(base)) {
+                    val sec = if (seconds > 0) seconds else hit.ms / 1000.0
+                    exact(hit.title, hit.artist, null, sec)?.let { return@runCatching it }
+                    searchTrack(hit.title, hit.artist, sec)?.let { return@runCatching it }
                 }
-                ordered.firstNotNullOfOrNull { pick(it, requireSynced = true) }?.let { return@runCatching it }
-                ordered.firstNotNullOfOrNull { pick(it) }?.let { return@runCatching it }
+                null
+            }.getOrNull()
+        }
+
+    /** Different ways to write the same name: no "feat.", no symbols, "Artist - Title" both ways. */
+    private fun variants(base: String): List<String> {
+        val list = linkedSetOf<String>()
+        list += base
+        list += base.replace(Regex("""(?i)\s*[(\[]?\s*(feat\.?|ft\.?|featuring)\s.*$"""), "").trim()
+        list += base.replace(Regex("""[^\p{L}\p{N}\s]"""), " ").replace(Regex("""\s+"""), " ").trim()
+        if (base.contains(" - ")) {
+            val a = base.substringBefore(" - ").trim()
+            val b = base.substringAfter(" - ").trim()
+            list += "$b $a"
+            list += b
+            list += a
+        }
+        return list.filter { it.length >= 2 }
+    }
+
+    private fun exact(title: String, artist: String, album: String?, seconds: Double): String? {
+        val url = BASE + "get?track_name=${enc(title)}&artist_name=${enc(artist)}" +
+            (album?.takeIf { it.isNotBlank() }?.let { "&album_name=${enc(it)}" } ?: "") +
+            (if (seconds > 0) "&duration=${seconds.toInt()}" else "")
+        return request(url)?.let { pick(JSONObject(it)) }
+    }
+
+    private fun searchText(query: String, seconds: Double): String? =
+        request(BASE + "search?q=${enc(query)}")?.let { choose(JSONArray(it), seconds) }
+
+    private fun searchTrack(title: String, artist: String, seconds: Double): String? =
+        request(BASE + "search?track_name=${enc(title)}&artist_name=${enc(artist)}")
+            ?.let { choose(JSONArray(it), seconds) }
+
+    /** Picks the best result: only songs with (almost) the same length, synced lyrics first. */
+    private fun choose(results: JSONArray, seconds: Double): String? {
+        val all = (0 until results.length()).map { results.getJSONObject(it) }
+        val near = (if (seconds > 0) all.filter { abs(it.optDouble("duration", 0.0) - seconds) <= DURATION_TOLERANCE_S } else all)
+            .sortedBy { abs(it.optDouble("duration", 0.0) - seconds) }
+        return near.firstNotNullOfOrNull { pick(it, requireSynced = true) }
+            ?: near.firstNotNullOfOrNull { pick(it) }
+    }
+
+    /** iTunes search: free, no key, and it understands loose / partial names well. */
+    private fun catalog(term: String): List<Hit> {
+        val out = mutableListOf<Hit>()
+        for (country in listOf("JP", "US")) {
+            val body = runCatching {
+                request("https://itunes.apple.com/search?term=${enc(term)}&media=music&entity=song&limit=4&country=$country")
+            }.getOrNull() ?: continue
+            val items = JSONObject(body).optJSONArray("results") ?: continue
+            for (i in 0 until items.length()) {
+                val o = items.getJSONObject(i)
+                out += Hit(o.optString("trackName"), o.optString("artistName"), o.optLong("trackTimeMillis"))
             }
-            null
-        }.getOrNull()
+        }
+        return out.filter { it.title.isNotBlank() && it.artist.isNotBlank() }.distinctBy { it.title + "|" + it.artist }.take(6)
     }
 
     private fun pick(o: JSONObject, requireSynced: Boolean = false): String? {
@@ -149,6 +205,8 @@ object LrcLib {
             connection.readTimeout = 15_000
             connection.setRequestProperty("User-Agent", USER_AGENT)
             if (connection.responseCode != 200) null else connection.inputStream.bufferedReader().use { it.readText() }
+        } catch (e: Exception) {
+            null
         } finally {
             connection.disconnect()
         }
@@ -198,7 +256,14 @@ object LyricsResolver {
         .trim()
 
     /** Cached lyrics, then a .lrc/.srt next to the song, then LRCLIB on the internet. */
-    suspend fun resolve(context: Context, uri: Uri, info: SongInfo, fileTitle: String, key: String): Result {
+    suspend fun resolve(
+        context: Context,
+        uri: Uri,
+        info: SongInfo,
+        fileTitle: String,
+        key: String,
+        query: String? = null,
+    ): Result {
         val cache = cacheFile(context, key)
         if (cache.isFile && cache.length() > 0) return Result.Found(cache, "cache")
 
@@ -210,7 +275,7 @@ object LyricsResolver {
             }
         }
 
-        val online = LrcLib.find(info, cleanName(fileTitle))
+        val online = LrcLib.find(info, cleanName(fileTitle), query)
         online?.let { text ->
             LrcConverter.toSrt(text, info.durationMs)?.let {
                 withContext(Dispatchers.IO) { cache.writeText(it) }

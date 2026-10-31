@@ -90,7 +90,7 @@
     <string name="song_dial_searching">Searching lyrics…</string>
     <string name="song_dial_not_found">Couldn\'t find lyrics for this song (or there is no internet). You can pick a lyrics file (.lrc, .srt or .txt) from your phone.</string>
     <string name="song_dial_pick_file">Pick lyrics file</string>
-    <string name="song_dial_retry">Search again</string>
+    <string name="song_dial_retry">Search with this name</string>
     <string name="song_dial_back">Back</string>
     <string name="dial_loop">Repeat this background track</string>
     <string name="dial_pc_ai_help">Best results: export the book, give the file to an AI running on your PC (for example in LM Studio or Ollama), save its answer as a text file and import it here.</string>
@@ -103,4 +103,5 @@
     <string name="dial_mood_dial">Music dial</string>
     <string name="dial_radial_active">On · tap to turn off</string>
     <string name="dial_radial_pick">Tap to play</string>
+    <string name="song_dial_search_hint">Song name, or artist - title</string>
 </resources>
