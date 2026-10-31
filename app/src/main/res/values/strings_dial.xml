@@ -104,4 +104,7 @@
     <string name="dial_radial_active">On · tap to turn off</string>
     <string name="dial_radial_pick">Tap to play</string>
     <string name="song_dial_search_hint">Song name, or artist - title</string>
+    <string name="music_shuffle_all">Shuffle all</string>
+    <string name="music_shuffle">Shuffle</string>
+    <string name="music_song_count">%1$d songs</string>
 </resources>

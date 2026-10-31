@@ -104,4 +104,7 @@
     <string name="dial_radial_active">Activo · tocá para apagar</string>
     <string name="dial_radial_pick">Tocá para activar</string>
     <string name="song_dial_search_hint">Nombre de la canción, o artista - título</string>
+    <string name="music_shuffle_all">Aleatorio (todo)</string>
+    <string name="music_shuffle">Aleatorio</string>
+    <string name="music_song_count">%1$d canciones</string>
 </resources>

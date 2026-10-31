@@ -3,6 +3,27 @@ package eu.kanade.tachiyomi.ui.music
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -120,6 +141,7 @@ private fun MusicScreen(titleContent: @Composable () -> Unit) {
     var loading by remember { mutableStateOf(true) }
     var searchQuery by remember { mutableStateOf<String?>(null) }
     var sortDescending by remember { mutableStateOf(false) }
+    var openFolder by remember { mutableStateOf<Uri?>(null) }
 
     // Load the saved folders once.
     LaunchedEffect(Unit) {
@@ -141,6 +163,15 @@ private fun MusicScreen(titleContent: @Composable () -> Unit) {
 
     // Back closes the search first.
     androidx.activity.compose.BackHandler(enabled = searchQuery != null) { searchQuery = null }
+    // Then back leaves the open folder.
+    androidx.activity.compose.BackHandler(enabled = searchQuery == null && openFolder != null) { openFolder = null }
+
+    val removeFolder: (MusicFolder) -> Unit = { folder ->
+        MusicFolderStore.releaseAccess(context, folder.uri)
+        folders.removeAll { it.uri == folder.uri }
+        if (openFolder == folder.uri) openFolder = null
+        MusicFolderStore.save(context, folders.map { it.uri })
+    }
 
     // Songs shown: filtered by the search text and sorted.
     val query = searchQuery?.trim().orEmpty()
@@ -181,14 +212,15 @@ private fun MusicScreen(titleContent: @Composable () -> Unit) {
             when {
                 loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 folders.isEmpty() -> EmptyState(onAdd = { picker.launch(null) })
-                else -> TrackList(
+                query.isNotEmpty() -> TrackList(folders = shown, searching = true, onRemove = removeFolder)
+                shown.any { it.uri == openFolder } -> FolderView(
+                    folder = shown.first { it.uri == openFolder },
+                    onBack = { openFolder = null },
+                )
+                else -> FolderGrid(
                     folders = shown,
-                    searching = query.isNotEmpty(),
-                    onRemove = { folder ->
-                        MusicFolderStore.releaseAccess(context, folder.uri)
-                        folders.removeAll { it.uri == folder.uri }
-                        MusicFolderStore.save(context, folders.map { it.uri })
-                    },
+                    onOpen = { openFolder = it.uri },
+                    onRemove = removeFolder,
                 )
             }
         }
@@ -215,11 +247,16 @@ private fun EmptyState(onAdd: () -> Unit) {
 }
 
 @Composable
-private fun TrackList(folders: List<MusicFolder>, searching: Boolean, onRemove: (MusicFolder) -> Unit) {
+private fun TrackList(
+    folders: List<MusicFolder>,
+    searching: Boolean,
+    onRemove: (MusicFolder) -> Unit,
+    showFolderHeaders: Boolean = true,
+) {
     val context = LocalContext.current
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         folders.filter { !searching || it.tracks.isNotEmpty() }.forEach { folder ->
-            item(key = "folder_${folder.uri}") {
+            if (showFolderHeaders) item(key = "folder_${folder.uri}") {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -352,5 +389,157 @@ private fun MiniPlayer(track: MusicTrack) {
                 }
             }
         }
+    }
+}
+
+/** The folders as cover cards (2 per row); a button plays everything in random order. */
+@Composable
+private fun FolderGrid(
+    folders: List<MusicFolder>,
+    onOpen: (MusicFolder) -> Unit,
+    onRemove: (MusicFolder) -> Unit,
+) {
+    val context = LocalContext.current
+    val allTracks = folders.flatMap { it.tracks }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        contentPadding = PaddingValues(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        item(span = { GridItemSpan(maxLineSpan) }, key = "shuffle_all") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilledTonalButton(
+                    onClick = {
+                        val list = allTracks.shuffled()
+                        list.firstOrNull()?.let { MusicPlayer.play(context, it, list) }
+                    },
+                    enabled = allTracks.isNotEmpty(),
+                ) {
+                    Icon(Icons.Filled.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text(stringResource(R.string.music_shuffle_all), modifier = Modifier.padding(start = 8.dp))
+                }
+            }
+        }
+        items(folders, key = { it.uri.toString() }) { folder ->
+            FolderCard(folder = folder, onOpen = { onOpen(folder) }, onRemove = { onRemove(folder) })
+        }
+    }
+}
+
+@Composable
+private fun FolderCard(folder: MusicFolder, onOpen: () -> Unit, onRemove: () -> Unit) {
+    val context = LocalContext.current
+    val cover by produceState<ImageBitmap?>(null, folder.uri, folder.tracks.size) {
+        value = MusicCovers.forFolder(context, folder)
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MusicCovers.colorFor(folder.name))
+            .clickable(onClick = onOpen),
+    ) {
+        cover?.let {
+            Image(
+                bitmap = it,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        // Dark fade at the bottom so the name is always readable.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0.45f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = 0.8f),
+                    ),
+                ),
+        )
+        Icon(
+            Icons.Filled.Folder,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.align(Alignment.TopStart).padding(8.dp).size(20.dp),
+        )
+        IconButton(
+            onClick = onRemove,
+            modifier = Modifier.align(Alignment.TopEnd).size(36.dp),
+        ) {
+            Icon(
+                Icons.Outlined.Close,
+                contentDescription = stringResource(R.string.music_remove_folder),
+                tint = Color.White.copy(alpha = 0.8f),
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Column(modifier = Modifier.align(Alignment.BottomStart).padding(10.dp)) {
+            Text(
+                folder.name,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                stringResource(R.string.music_song_count, folder.tracks.size),
+                color = Color.White.copy(alpha = 0.75f),
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
+    }
+}
+
+/** Inside one folder: back, Shuffle / Play buttons and the songs. */
+@Composable
+private fun FolderView(folder: MusicFolder, onBack: () -> Unit) {
+    val context = LocalContext.current
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp, top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.song_dial_back))
+            }
+            Text(
+                folder.name,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            FilledTonalButton(
+                onClick = {
+                    val list = folder.tracks.shuffled()
+                    list.firstOrNull()?.let { MusicPlayer.play(context, it, list) }
+                },
+                enabled = folder.tracks.isNotEmpty(),
+            ) {
+                Icon(Icons.Filled.Shuffle, contentDescription = stringResource(R.string.music_shuffle), modifier = Modifier.size(18.dp))
+            }
+            Spacer(Modifier.width(8.dp))
+            Button(
+                onClick = { folder.tracks.firstOrNull()?.let { MusicPlayer.play(context, it, folder.tracks) } },
+                enabled = folder.tracks.isNotEmpty(),
+            ) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.music_play), modifier = Modifier.size(18.dp))
+            }
+        }
+        TrackList(
+            folders = listOf(folder),
+            searching = false,
+            onRemove = {},
+            showFolderHeaders = false,
+        )
     }
 }

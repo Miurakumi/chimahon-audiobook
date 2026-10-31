@@ -126,14 +126,11 @@ class SongDialActivity : ComponentActivity() {
                             }
                         }
                         Phase.Missing -> MissingPane()
-                        Phase.Ready -> AudiobookScreen(
+                        Phase.Ready -> SongLyricsScreen(
                             bookKey = key,
-                            title = songTitle,
-                            fontName = "",
-                            fontUrl = null,
-                            fontSize = 22f,
-                            lineHeight = 1.6f,
-                            characterSpacing = 0f,
+                            title = info?.title ?: songTitle,
+                            artist = info?.artist,
+                            cover = cover,
                             isPopupActive = popupVisible,
                             onLookup = { word, sentence, offset, x, y, w, h ->
                                 startLookup(word, sentence, offset, x, y, w, h)

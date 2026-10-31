@@ -79,6 +79,15 @@ class AudiobookController(
         persist()
     }
 
+    /** Song mode: the audio keeps playing past the end of each line and the active line follows it. */
+    var continuousMode by mutableStateOf(false)
+
+    /** Position and length of the audio in ms (kept up to date while it plays in song mode). */
+    var positionMs by mutableIntStateOf(0)
+        private set
+    var durationMs by mutableIntStateOf(0)
+        private set
+
     /** Work mode: after each line the dial slides to the next one and plays it by itself. */
     var workMode by mutableStateOf(false)
         private set
@@ -186,6 +195,8 @@ class AudiobookController(
                     true
                 }
                 player = mp
+                durationMs = runCatching { mp.duration }.getOrDefault(0).coerceAtLeast(0)
+                positionMs = 0
                 appliedSpeed = 1f
                 lines = parsed
                 auto.attach(parsed, state.moodLabels)
@@ -248,7 +259,7 @@ class AudiobookController(
             return
         }
         pause("nueva línea")
-        currentEndMs = line.endMs + TAIL_MS
+        currentEndMs = if (continuousMode) Long.MAX_VALUE else line.endMs + TAIL_MS
         pendingPlay = true
         seeking = true
         debug = "buscando ${line.startMs} ms"
@@ -301,6 +312,7 @@ class AudiobookController(
             while (isActive) {
                 if (!seeking) {
                     val position = runCatching { mp.currentPosition }.getOrDefault(Int.MAX_VALUE)
+                    if (continuousMode && position != Int.MAX_VALUE) followPosition(position)
                     if (position >= currentEndMs) {
                         pause("fin de la línea (pos $position ms)")
                         if (workMode) scope.launch { advanceWorkMode() }
@@ -338,8 +350,48 @@ class AudiobookController(
         if (isPlaying) {
             workMode = false
             pause()
+        } else if (continuousMode && positionMs > 0 && positionMs < durationMs - 500 && player != null) {
+            // Song mode: continue from where it was paused instead of replaying the line.
+            startPlayer(player!!)
         } else {
             playLine(activeIndex)
+        }
+    }
+
+    // ---------------------------------------------------------------- song mode
+
+    /** Index of the line that is being sung at [ms] (the last one that has already started). */
+    fun lineIndexAt(ms: Long): Int {
+        if (lines.isEmpty()) return 0
+        var low = 0
+        var high = lines.lastIndex
+        while (low < high) {
+            val mid = (low + high + 1) / 2
+            if (lines[mid].startMs <= ms) low = mid else high = mid - 1
+        }
+        return low
+    }
+
+    private fun followPosition(position: Int) {
+        positionMs = position
+        val index = lineIndexAt(position.toLong())
+        if (index != activeIndex) {
+            activeIndex = index
+            applyAutoMood(index)
+            persist()
+        }
+    }
+
+    /** Slider: jump to [ms] in the audio, keeping the play/pause state. */
+    fun seekToMs(ms: Int) {
+        val mp = player ?: return
+        val target = ms.coerceIn(0, durationMs)
+        runCatching { mp.seekTo(target) }
+        positionMs = target
+        val index = lineIndexAt(target.toLong())
+        if (index != activeIndex) {
+            activeIndex = index
+            persist()
         }
     }
 
