@@ -99,7 +99,9 @@ fun SongLyricsScreen(
     }
 
     val coverBitmap = remember(cover) { cover?.let { MusicCovers.decodeBitmap(it) } }
-    val accent = remember(coverBitmap) { coverBitmap?.let { MusicCovers.averageColor(it) } ?: Color(0xFF4B4580) }
+    // No cover: follow the app theme color.
+    val themeColor = MaterialTheme.colorScheme.primary
+    val accent = remember(coverBitmap, themeColor) { coverBitmap?.let { MusicCovers.averageColor(it) } ?: themeColor }
     val topColor = remember(accent) { lerp(accent, Color.Black, 0.25f) }
     val bottomColor = remember(accent) { lerp(accent, Color.Black, 0.8f) }
 

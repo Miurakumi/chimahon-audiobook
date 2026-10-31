@@ -442,7 +442,7 @@ private fun FolderCard(folder: MusicFolder, onOpen: () -> Unit, onRemove: () -> 
             .fillMaxWidth()
             .aspectRatio(1f)
             .clip(RoundedCornerShape(14.dp))
-            .background(MusicCovers.colorFor(folder.name))
+            .background(androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.primary, Color.Black, 0.45f))
             .clickable(onClick = onOpen),
     ) {
         cover?.let {
