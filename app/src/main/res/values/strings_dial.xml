@@ -114,4 +114,5 @@
     <string name="song_dial_paste_note">Without times, the lines are spread across the song. Lines that start like [01:23.45] keep their times.</string>
     <string name="song_dial_save">Save</string>
     <string name="song_dial_cancel">Cancel</string>
+    <string name="novel_music_chapter">Chapter %1$d · %2$d paragraphs. Auto, export and import work on this chapter only.</string>
 </resources>

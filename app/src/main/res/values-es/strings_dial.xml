@@ -114,4 +114,5 @@
     <string name="song_dial_paste_note">Sin tiempos, las líneas se reparten a lo largo de la canción. Las líneas que empiezan como [01:23.45] conservan sus tiempos.</string>
     <string name="song_dial_save">Guardar</string>
     <string name="song_dial_cancel">Cancelar</string>
+    <string name="novel_music_chapter">Capítulo %1$d · %2$d párrafos. Auto, exportar e importar funcionan solo en este capítulo.</string>
 </resources>

@@ -633,6 +633,25 @@ private fun Controls(controller: AudiobookController, onOpenMusicSettings: () ->
                         onOpenMusicSettings()
                     },
                     onDismiss = { dialOpen = false },
+                    extras = {
+                TextButton(onClick = { controller.cycleMode() }) {
+                            Text(
+                                stringResource(
+                                    R.string.dial_mode_label,
+                                    stringResource(
+                                        when (controller.mode) {
+                                            PlayMode.ALL -> R.string.dial_mode_all
+                                            PlayMode.QUOTES -> R.string.dial_mode_quotes
+                                            PlayMode.MANUAL -> R.string.dial_mode_manual
+                                        },
+                                    ),
+                                ),
+                            )
+                        }
+                        TextButton(onClick = { controller.cycleSpeed() }) {
+                            Text(stringResource(R.string.dial_speed, controller.state.speed.toString()))
+                        }
+                    },
                 )
             }
 
@@ -823,11 +842,12 @@ private fun MoodMenuItem(
 // ------------------------------------------------------------------ music settings
 
 @Composable
-private fun MusicDialog(
+internal fun MusicDialog(
     music: BackgroundMusic,
     auto: AutoMood,
     onClearAnalysis: () -> Unit,
     onDismiss: () -> Unit,
+    heading: String? = null,
 ) {
     var pending by remember { mutableStateOf<Mood?>(null) }
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -886,6 +906,7 @@ private fun MusicDialog(
 
                 // ---- Auto (experimental): a small on-device model reads the SRT.
                 Text(stringResource(R.string.dial_auto_title), style = MaterialTheme.typography.titleSmall)
+                heading?.let { Text(it, style = MaterialTheme.typography.labelMedium) }
                 Text(
                     stringResource(R.string.dial_auto_help),
                     style = MaterialTheme.typography.bodySmall,
@@ -1008,10 +1029,11 @@ private class DialSlot(val mood: Mood?, val label: String, val color: Color) // 
  * (tap again on the one that is playing to turn the music off).
  */
 @Composable
-private fun MoodDialDialog(
-    controller: AudiobookController,
+internal fun MoodDialDialog(
+    controller: MoodDialHost,
     onOpenMusicSettings: () -> Unit,
     onDismiss: () -> Unit,
+    extras: @Composable () -> Unit = {},
 ) {
     val autoLabel = stringResource(R.string.dial_auto)
     val moodLabels = Mood.entries.map { stringResource(it.labelRes) }
@@ -1156,23 +1178,7 @@ private fun MoodDialDialog(
                     }
                 }
 
-                TextButton(onClick = { controller.cycleMode() }) {
-                    Text(
-                        stringResource(
-                            R.string.dial_mode_label,
-                            stringResource(
-                                when (controller.mode) {
-                                    PlayMode.ALL -> R.string.dial_mode_all
-                                    PlayMode.QUOTES -> R.string.dial_mode_quotes
-                                    PlayMode.MANUAL -> R.string.dial_mode_manual
-                                },
-                            ),
-                        ),
-                    )
-                }
-                TextButton(onClick = { controller.cycleSpeed() }) {
-                    Text(stringResource(R.string.dial_speed, controller.state.speed.toString()))
-                }
+                extras()
                 TextButton(onClick = onOpenMusicSettings) {
                     Text(stringResource(R.string.dial_music_settings))
                 }

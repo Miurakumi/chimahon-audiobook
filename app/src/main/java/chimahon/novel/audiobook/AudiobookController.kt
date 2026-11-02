@@ -44,7 +44,7 @@ class AudiobookController(
     private val context: Context,
     private val bookKey: String,
     private val scope: CoroutineScope,
-) {
+) : MoodDialHost {
     var state by mutableStateOf(AudiobookState())
         private set
     var lines by mutableStateOf<List<SrtLine>>(emptyList())
@@ -71,7 +71,7 @@ class AudiobookController(
         get() = state.audioUri != null && state.srtUri != null
 
     /** Background music (immersion mode), independent from the narration player. */
-    val music = BackgroundMusic(context, scope)
+    override val music = BackgroundMusic(context, scope)
 
     /** Detects the mood of the book with a small on-device model ("Auto" button). */
     val auto = AutoMood(context, scope) { labels ->
@@ -93,7 +93,7 @@ class AudiobookController(
         private set
 
     /** True while the music follows the detected mood of the active line. */
-    var autoMusic by mutableStateOf(false)
+    override var autoMusic by mutableStateOf(false)
         private set
 
     private var player: MediaPlayer? = null
@@ -449,7 +449,7 @@ class AudiobookController(
     // ---------------------------------------------------------------- auto music
 
     /** The "Auto" button: the music follows the mood detected for the active line. */
-    fun toggleAuto() {
+    override fun toggleAuto() {
         if (autoMusic) {
             autoMusic = false
             return
@@ -470,7 +470,7 @@ class AudiobookController(
     }
 
     /** A tap on a mood button: manual choice, so Auto turns off. */
-    fun pickMood(mood: Mood) {
+    override fun pickMood(mood: Mood) {
         autoMusic = false
         music.select(mood)
     }

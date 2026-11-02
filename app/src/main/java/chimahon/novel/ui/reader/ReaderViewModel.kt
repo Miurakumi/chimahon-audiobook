@@ -1242,6 +1242,28 @@ class ReaderViewModel(
         return readPackageFile(spineIndex) ?: throw IllegalStateException("Couldn't load chapter")
     }
 
+    /** Plain-text paragraphs of a chapter (furigana removed), used by the immersive music. */
+    suspend fun chapterParagraphs(spineIndex: Int): List<String> {
+        val html = runCatching { loadChapterContent(spineIndex) }.getOrNull() ?: return emptyList()
+        return withContext(Dispatchers.Default) {
+            val body = html
+                .replace(Regex("(?is)<(script|style|head)[^>]*>.*?</\\1>"), " ")
+                .replace(Regex("(?is)<(rt|rp)[^>]*>.*?</\\1>"), "")
+                .replace(Regex("(?i)<br\\s*/?>|</(p|div|h[1-6]|li|section|blockquote)>"), "\n")
+                .replace(Regex("(?s)<[^>]*>"), "")
+                .replace("&nbsp;", " ").replace("&lt;", "<").replace("&gt;", ">")
+                .replace("&quot;", "\"").replace("&apos;", "'")
+                .replace(Regex("&#x([0-9a-fA-F]+);")) { m ->
+                    m.groupValues[1].toIntOrNull(16)?.let { String(Character.toChars(it)) } ?: ""
+                }
+                .replace(Regex("&#(\\d+);")) { m ->
+                    m.groupValues[1].toIntOrNull()?.let { String(Character.toChars(it)) } ?: ""
+                }
+                .replace("&amp;", "&")
+            body.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
+        }
+    }
+
     private fun readPackageFile(spineIndex: Int): String? = runCatching {
         document.chapterAbsolutePath(spineIndex.toUInt())
             ?.let { java.io.File(it) }

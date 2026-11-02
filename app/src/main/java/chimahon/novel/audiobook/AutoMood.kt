@@ -511,8 +511,8 @@ class AutoMood(
 
         /** Instructions placed at the top of the file for the PC AI. %N = number of lines. */
         private const val EXPORT_PROMPT =
-            "TASK: I am listening to a Japanese audiobook and want background music that follows the scenes. " +
-                "Below, after '=== TEXT ===', the book is split into %N numbered lines (format: number | text). " +
+            "TASK: I am reading (or listening to) a Japanese book and want background music that follows the scenes. " +
+                "Below, after '=== TEXT ===', the text is split into %N numbered lines (format: number | text). " +
                 "Read it, split it into scenes, and decide the mood of each scene by its overall feeling (what is happening, " +
                 "how the characters feel, what came before), not by single words.\n\n" +
                 "ANSWER FORMAT: only lines like  START-END MOOD  (line numbers, then one mood word). " +

@@ -76,6 +76,8 @@ fun ReaderScreen(
     val context = LocalContext.current
 
     var showAudiobook by remember { mutableStateOf(false) }
+    var showNovelDial by remember { mutableStateOf(false) }
+    var showNovelMusicSettings by remember { mutableStateOf(false) }
     var focusMode by remember { mutableStateOf(false) }
     var activeSheet by remember { mutableStateOf<ActiveSheet?>(null) }
     var tappedImageUri by remember { mutableStateOf<String?>(null) }
@@ -401,6 +403,25 @@ fun ReaderScreen(
 
         // Overlays — direct BoxWithConstraints children (BoxScope available)
         val readyVm = (loadState as? ReaderLoadState.Ready)?.viewModel
+        val novelMusic = remember(readyVm) {
+            readyVm?.let { vm ->
+                chimahon.novel.audiobook.NovelMusicController(context, book.folder ?: book.id, scope) { vm.chapterParagraphs(it) }
+            }
+        }
+        if (readyVm != null && novelMusic != null) {
+            LaunchedEffect(novelMusic, readyVm.index) { novelMusic.openChapter(readyVm.index) }
+            LaunchedEffect(novelMusic) {
+                snapshotFlow { readyVm.bridge.progress }.collect { novelMusic.onProgress(it) }
+            }
+            DisposableEffect(novelMusic) { onDispose { novelMusic.release() } }
+            val musicView = androidx.compose.ui.platform.LocalView.current
+            val analyzing = novelMusic.auto.running
+            DisposableEffect(analyzing) {
+                val previous = musicView.keepScreenOn
+                if (analyzing) musicView.keepScreenOn = true
+                onDispose { musicView.keepScreenOn = previous }
+            }
+        }
 
         val lifecycleOwner = LocalLifecycleOwner.current
         DisposableEffect(lifecycleOwner, readyVm) {
@@ -464,7 +485,12 @@ fun ReaderScreen(
                     contentColor = currentSettings.textColor,
                     onToggleHud = { onShowHudChanged(false) },
                     onToggleFocusMode = { focusMode = true },
+                    onOpenMusic = {
+                        showNovelDial = true
+                        onShowHudChanged(false)
+                    },
                     onOpenAudiobook = {
+                        novelMusic?.stop()
                         showAudiobook = true
                         onShowHudChanged(false)
                     },
@@ -526,6 +552,30 @@ fun ReaderScreen(
                 isPopupActive = isPopupActive,
                 onDismissPopupRequested = onDismissPopupRequested,
                 onDismiss = { tappedImageUri = null },
+            )
+        }
+
+        if (showNovelDial && novelMusic != null) {
+            chimahon.novel.audiobook.MoodDialDialog(
+                controller = novelMusic,
+                onOpenMusicSettings = {
+                    showNovelDial = false
+                    showNovelMusicSettings = true
+                },
+                onDismiss = { showNovelDial = false },
+            )
+        }
+        if (showNovelMusicSettings && novelMusic != null) {
+            chimahon.novel.audiobook.MusicDialog(
+                music = novelMusic.music,
+                auto = novelMusic.auto,
+                onClearAnalysis = { novelMusic.clearAnalysis() },
+                onDismiss = { showNovelMusicSettings = false },
+                heading = androidx.compose.ui.res.stringResource(
+                    eu.kanade.tachiyomi.R.string.novel_music_chapter,
+                    novelMusic.chapter + 1,
+                    novelMusic.paragraphCount,
+                ),
             )
         }
 
@@ -603,6 +653,7 @@ private fun ReaderBottomBar(
     contentColor: Int,
     onToggleHud: () -> Unit,
     onToggleFocusMode: () -> Unit,
+    onOpenMusic: () -> Unit,
     onOpenAudiobook: () -> Unit,
     onOpenChapters: () -> Unit,
     onOpenAppearance: () -> Unit,
@@ -628,6 +679,13 @@ private fun ReaderBottomBar(
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            IconButton(onClick = onOpenMusic) {
+                Icon(
+                    Icons.Outlined.MusicNote,
+                    contentDescription = "Music",
+                    tint = Color(contentColor)
+                )
+            }
             IconButton(onClick = onOpenAudiobook) {
                 Icon(
                     Icons.Outlined.Headphones,
