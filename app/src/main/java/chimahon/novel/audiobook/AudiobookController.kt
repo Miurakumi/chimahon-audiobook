@@ -517,33 +517,60 @@ class AudiobookController(
         val appContext = context.applicationContext
         return LazyAnkiSentenceAudioProvider {
             withContext<AnkiSentenceAudioPreparation>(Dispatchers.IO) {
-                val out = File(appContext.cacheDir, "chimahon_dial_${System.currentTimeMillis()}.m4a")
+                val stamp = System.currentTimeMillis()
+                val outM4a = File(appContext.cacheDir, "chimahon_dial_$stamp.m4a")
+                val outMp3 = File(appContext.cacheDir, "chimahon_dial_$stamp.mp3")
+                val copy = File(appContext.cacheDir, "chimahon_dial_src_$stamp")
                 try {
-                    val input = FFmpegKitConfig.getSafParameterForRead(appContext, audio)
+                    val safInput = FFmpegKitConfig.getSafParameterForRead(appContext, audio)
                         ?: return@withContext AnkiSentenceAudioPreparation.Unavailable(
                             AnkiSentenceAudioFailure.SOURCE_UNAVAILABLE,
                         )
                     val start = (line.startMs - CLIP_PAD_MS).coerceAtLeast(0L)
                     val end = line.endMs + CLIP_PAD_MS
-                    val args = arrayOf(
-                        "-ss", "%.3f".format(java.util.Locale.US, start / 1000.0),
-                        "-t", "%.3f".format(java.util.Locale.US, (end - start) / 1000.0),
-                        "-i", input,
-                        "-vn", "-sn", "-dn",
-                        "-c:a", "aac", "-b:a", "128k",
-                        "-y", out.absolutePath,
-                    )
-                    val result = FfmpegRunner.ffmpeg(args)
-                    if (result !is FfmpegCommandResult.Success || !out.isFile || out.length() <= 0L) {
-                        return@withContext AnkiSentenceAudioPreparation.Unavailable(
-                            AnkiSentenceAudioFailure.EXTRACTION_FAILED,
+                    val ss = "%.3f".format(java.util.Locale.US, start / 1000.0)
+                    val t = "%.3f".format(java.util.Locale.US, (end - start) / 1000.0)
+
+                    fun cut(input: String, codec: Array<String>, out: File): Boolean {
+                        out.delete()
+                        val args = arrayOf("-ss", ss, "-t", t, "-i", input, "-map", "0:a:0", "-vn", "-sn", "-dn") +
+                            codec + arrayOf("-ac", "2", "-y", out.absolutePath)
+                        val result = FfmpegRunner.ffmpeg(args)
+                        return result is FfmpegCommandResult.Success && out.isFile && out.length() > 0L
+                    }
+
+                    val aac = arrayOf("-c:a", "aac", "-b:a", "128k")
+                    val mp3 = arrayOf("-c:a", "libmp3lame", "-b:a", "128k")
+
+                    // 1) straight from the SAF stream; songs (mp3/flac with cover art) sometimes fail here
+                    if (cut(safInput, aac, outM4a)) {
+                        return@withContext AnkiSentenceAudioPreparation.Ready(
+                            AnkiSentenceAudioSource.fromBytes(outM4a.readBytes(), "m4a"),
                         )
                     }
-                    AnkiSentenceAudioPreparation.Ready(
-                        AnkiSentenceAudioSource.fromBytes(out.readBytes(), "m4a"),
-                    )
+                    // 2) same on a real file (seekable), AAC then MP3
+                    val copied = runCatching {
+                        appContext.contentResolver.openInputStream(audio)?.use { input ->
+                            copy.outputStream().use { input.copyTo(it) }
+                        } != null
+                    }.getOrDefault(false)
+                    if (copied && copy.length() > 0L) {
+                        if (cut(copy.absolutePath, aac, outM4a)) {
+                            return@withContext AnkiSentenceAudioPreparation.Ready(
+                                AnkiSentenceAudioSource.fromBytes(outM4a.readBytes(), "m4a"),
+                            )
+                        }
+                        if (cut(copy.absolutePath, mp3, outMp3)) {
+                            return@withContext AnkiSentenceAudioPreparation.Ready(
+                                AnkiSentenceAudioSource.fromBytes(outMp3.readBytes(), "mp3"),
+                            )
+                        }
+                    }
+                    AnkiSentenceAudioPreparation.Unavailable(AnkiSentenceAudioFailure.EXTRACTION_FAILED)
                 } finally {
-                    out.delete()
+                    outM4a.delete()
+                    outMp3.delete()
+                    copy.delete()
                 }
             }
         }
