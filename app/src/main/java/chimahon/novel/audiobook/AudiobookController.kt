@@ -531,7 +531,7 @@ class AudiobookController(
                     val ss = "%.3f".format(java.util.Locale.US, start / 1000.0)
                     val t = "%.3f".format(java.util.Locale.US, (end - start) / 1000.0)
 
-                    fun cut(input: String, codec: Array<String>, out: File): Boolean {
+                    suspend fun cut(input: String, codec: Array<String>, out: File): Boolean {
                         out.delete()
                         val args = arrayOf("-ss", ss, "-t", t, "-i", input, "-map", "0:a:0", "-vn", "-sn", "-dn") +
                             codec + arrayOf("-ac", "2", "-y", out.absolutePath)
